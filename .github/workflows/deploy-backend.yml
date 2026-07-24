@@ -87,6 +87,7 @@ jobs:
             --s3-bucket ${{ secrets.SAM_DEPLOY_BUCKET }} \
             --capabilities CAPABILITY_IAM \
             --region ap-south-1 \
+            --debug \
             --parameter-overrides \
               GuestJwtSecret=${{ secrets.GUEST_JWT_SECRET }} \
               ExistingBucketName=eventsnap-uploads-anwesh2712

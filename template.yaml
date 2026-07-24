@@ -35,28 +35,6 @@ Resources:
   # ============================================
   # NOTE: S3 bucket was created manually as eventsnap-uploads-anwesh2712.
   # SAM references it via the ExistingBucketName parameter.
-  # We still need to configure CORS and the lifecycle rule on it.
-
-  # Grant SAM-deployed Lambdas permission to set S3 notifications
-  # by using BucketName property on the S3 event trigger below.
-
-  UploadBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref ExistingBucketName
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: DenyPublicAccess
-            Effect: Deny
-            Principal: "*"
-            Action: "s3:*"
-            Resource:
-              - !Sub "arn:aws:s3:::${ExistingBucketName}"
-              - !Sub "arn:aws:s3:::${ExistingBucketName}/*"
-            Condition:
-              Bool:
-                "aws:SecureTransport": false
 
   EventRoomsTable:
     Type: AWS::DynamoDB::Table
