@@ -1,11 +1,11 @@
 {
-  "name": "EventSnap",
-  "short_name": "EventSnap",
+  "name": "Prism",
+  "short_name": "Prism",
   "description": "AI-powered event photo gallery",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#7c3aed",
+  "background_color": "#0a0a0c",
+  "theme_color": "#111111",
   "orientation": "portrait",
   "icons": [
     {

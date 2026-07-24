@@ -10,7 +10,7 @@ export default function PhotoCard({ photo, allowDownload, onConfirm }) {
       const blob = await response.blob()
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `eventsnap-${photo.photoId}.jpg`
+      link.download = `prism-${photo.photoId}.jpg`
       link.click()
       URL.revokeObjectURL(link.href)
     } catch (e) {

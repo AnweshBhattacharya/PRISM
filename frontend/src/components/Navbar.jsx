@@ -43,7 +43,7 @@ export default function Navbar() {
               transition: 'transform 0.12s ease',
             }}
           >
-            Event<span className="text-muted">Snap</span>
+            Prism
           </Link>
 
           {/* ── Desktop Right side ───────────────── */}
