@@ -1,0 +1,363 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: EventSnap - Production Serverless Backend
+
+Globals:
+  Function:
+    Runtime: python3.11
+    MemorySize: 256
+    Timeout: 30
+    Environment:
+      Variables:
+        ROOMS_TABLE: !Ref EventRoomsTable
+        PHOTOS_TABLE: !Ref RoomPhotosTable
+        SESSIONS_TABLE: !Ref GuestSessionsTable
+        REKOGNITION_COLLECTION: eventsnap-faces
+        BUCKET_NAME: !Ref ExistingBucketName
+        GUEST_JWT_SECRET: !Ref GuestJwtSecret
+
+Parameters:
+  CognitoDomainPrefix:
+    Type: String
+    Default: eventsnap-auth
+  GuestJwtSecret:
+    Type: String
+    NoEcho: true
+    Description: Secret used to sign and verify guest JWTs
+  ExistingBucketName:
+    Type: String
+    Default: eventsnap-uploads-anwesh2712
+    Description: Name of the pre-existing S3 bucket for photo uploads
+
+Resources:
+  # ============================================
+  # 1. STORAGE (S3 & DynamoDB)
+  # ============================================
+  # NOTE: S3 bucket was created manually as eventsnap-uploads-anwesh2712.
+  # SAM references it via the ExistingBucketName parameter.
+  # We still need to configure CORS and the lifecycle rule on it.
+
+  # Grant SAM-deployed Lambdas permission to set S3 notifications
+  # by using BucketName property on the S3 event trigger below.
+
+  UploadBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ExistingBucketName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyPublicAccess
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub "arn:aws:s3:::${ExistingBucketName}"
+              - !Sub "arn:aws:s3:::${ExistingBucketName}/*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": false
+
+  EventRoomsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: hostId
+          AttributeType: S
+        - AttributeName: expiryDate
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: hostId-index
+          KeySchema:
+            - AttributeName: hostId
+              KeyType: HASH
+            - AttributeName: expiryDate
+              KeyType: RANGE
+          Projection: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  RoomPhotosTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: faceId
+          AttributeType: S
+        - AttributeName: roomId
+          AttributeType: S
+        - AttributeName: hash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: faceId-index
+          KeySchema:
+            - AttributeName: faceId
+              KeyType: HASH
+            - AttributeName: roomId
+              KeyType: RANGE
+          Projection: ALL
+        - IndexName: hash-index
+          KeySchema:
+            - AttributeName: hash
+              KeyType: HASH
+            - AttributeName: roomId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  GuestSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # ============================================
+  # 2. AUTHENTICATION (Cognito + Custom Authorizer)
+  # ============================================
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: EventSnap-Hosts
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: eventsnap-web
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  # ----- CUSTOM GUEST AUTHORIZER (Lambda) -----
+  GuestAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/authorizers/
+      Handler: guest_authorizer.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventRoomsTable
+
+  # ============================================
+  # 3. API GATEWAY (REST API)
+  # ============================================
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt CognitoUserPool.Arn
+          GuestAuthorizer:
+            FunctionArn: !GetAtt GuestAuthorizerFunction.Arn
+            Identity:
+              Headers:
+                - Authorization
+        DefaultAuthorizer: CognitoAuthorizer
+
+  # ============================================
+  # 4. LAMBDA FUNCTIONS (Handlers)
+  # ============================================
+
+  # --- A) Get Upload URL (Handles Pre-signed POST) ---
+  GetUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/handlers/
+      Handler: upload_url.lambda_handler
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref ExistingBucketName
+        - DynamoDBReadPolicy:
+            TableName: !Ref RoomPhotosTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /guest/upload-url
+            Method: POST
+            Auth:
+              Authorizer: GuestAuthorizer
+
+  # --- B) Rekognition Indexer (Triggered by S3) ---
+  IndexFacesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/handlers/
+      Handler: index_faces.lambda_handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rekognition:IndexFaces
+                - rekognition:DeleteFaces
+              Resource: !Sub "arn:aws:rekognition:${AWS::Region}:${AWS::AccountId}:collection/eventsnap-faces"
+        - DynamoDBWritePolicy:
+            TableName: !Ref RoomPhotosTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventRoomsTable
+        - DynamoDBWritePolicy:
+            TableName: !Ref EventRoomsTable
+        - S3ReadPolicy:
+            BucketName: !Ref ExistingBucketName
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref ExistingBucketName
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+
+  # --- C) Guest Search (Selfie Auth) ---
+  SearchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/handlers/
+      Handler: search.lambda_handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rekognition:SearchFacesByImage
+              Resource: !Sub "arn:aws:rekognition:${AWS::Region}:${AWS::AccountId}:collection/eventsnap-faces"
+        - DynamoDBReadPolicy:
+            TableName: !Ref RoomPhotosTable
+        - S3ReadPolicy:
+            BucketName: !Ref ExistingBucketName
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /guest/search
+            Method: POST
+            Auth:
+              Authorizer: GuestAuthorizer
+
+  # --- D) Room CRUD (Host Only) ---
+  RoomManagerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/handlers/
+      Handler: room_manager.lambda_handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref EventRoomsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventRoomsTable
+      Events:
+        ApiRooms:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /rooms
+            Method: ANY
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ApiRoomsById:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /rooms/{roomId}
+            Method: ANY
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  # --- E) Guest Token (No Auth — public entry point) ---
+  GuestTokenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/handlers/
+      Handler: guest_token.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventRoomsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /guest/token
+            Method: POST
+            Auth:
+              Authorizer: NONE
+
+  # --- F) Cleanup Scheduler (EventBridge) ---
+  CleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/handlers/
+      Handler: cleanup.lambda_handler
+      Policies:
+        - S3FullAccessPolicy:
+            BucketName: !Ref ExistingBucketName
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventRoomsTable
+        - DynamoDBWritePolicy:
+            TableName: !Ref RoomPhotosTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rekognition:DeleteFaces
+              Resource: !Sub "arn:aws:rekognition:${AWS::Region}:${AWS::AccountId}:collection/eventsnap-faces"
+      Events:
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 day)
+
+Outputs:
+  ApiGatewayUrl:
+    Description: "Base URL for the API"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+  CognitoClientId:
+    Description: "App Client ID for Frontend"
+    Value: !Ref CognitoUserPoolClient
+  UploadBucketName:
+    Description: "S3 Bucket for uploads"
+    Value: !Ref ExistingBucketName

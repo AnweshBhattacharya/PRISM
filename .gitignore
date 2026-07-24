@@ -1,0 +1,39 @@
+# ── Secrets ───────────────────────────────────────
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# ── Python ────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# ── Node / Frontend ───────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+npm-debug.log*
+
+# ── AWS SAM build artifacts ───────────────────────
+.aws-sam/
+samconfig.toml
+
+# ── IDE ───────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── History folder (demo files, not source) ───────
+history/

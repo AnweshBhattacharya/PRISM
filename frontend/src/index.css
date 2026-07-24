@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global Resets ─────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-dark-900 text-white font-sans antialiased;
+  min-height: 100vh;
+}
+
+/* ── Glassmorphism Card ─────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-hover {
+  @apply glass transition-all duration-300;
+}
+.glass-hover:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Primary Button ─────────────────────────────────────── */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
+         font-semibold text-white transition-all duration-200 cursor-pointer
+         bg-gradient-to-r from-brand-500 to-brand-600
+         hover:from-brand-400 hover:to-brand-500
+         active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 8px 25px rgba(124, 58, 237, 0.6);
+}
+
+/* ── Secondary Button ───────────────────────────────────── */
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
+         font-semibold transition-all duration-200 cursor-pointer
+         border border-white/10 text-white/80
+         hover:bg-white/5 hover:border-white/20 hover:text-white
+         active:scale-95 disabled:opacity-50;
+}
+
+/* ── Input Field ────────────────────────────────────────── */
+.input-field {
+  @apply w-full px-4 py-3 rounded-xl bg-dark-700 border border-white/10
+         text-white placeholder-white/30 outline-none
+         focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20
+         transition-all duration-200;
+}
+
+/* ── Section Label ──────────────────────────────────────── */
+.label {
+  @apply block text-sm font-medium text-white/60 mb-2;
+}
+
+/* ── Gradient Text ──────────────────────────────────────── */
+.gradient-text {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(135deg, #a78bfa, #22d3ee);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a0a0f; }
+::-webkit-scrollbar-thumb { background: #2d2d45; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+
+/* ── Page transition ────────────────────────────────────── */
+.page-enter {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Progress bar ───────────────────────────────────────── */
+.progress-bar {
+  @apply h-1.5 rounded-full bg-dark-600 overflow-hidden;
+}
+.progress-fill {
+  @apply h-full rounded-full bg-gradient-to-r from-brand-500 to-accent-500 transition-all duration-300;
+}
+
+/* ── Glow effects ───────────────────────────────────────── */
+.glow-brand {
+  box-shadow: 0 0 30px rgba(124, 58, 237, 0.3);
+}
+.glow-accent {
+  box-shadow: 0 0 30px rgba(34, 211, 238, 0.2);
+}
