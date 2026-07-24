@@ -117,7 +117,7 @@ def _list_rooms(host_id: str) -> dict:
             {
                 "roomId": item["PK"].replace("ROOM#", ""),
                 "name": item.get("roomName"),
-                "photoCount": item.get("photoCount", 0),
+                "photoCount": int(item.get("photoCount", 0)),
                 "expiryDate": item.get("expiryDate"),
                 "allowDownload": item.get("allowDownload", True),
             }
