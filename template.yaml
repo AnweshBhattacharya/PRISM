@@ -17,9 +17,6 @@ Globals:
         GUEST_JWT_SECRET: !Ref GuestJwtSecret
 
 Parameters:
-  CognitoDomainPrefix:
-    Type: String
-    Default: eventsnap-auth
   GuestJwtSecret:
     Type: String
     NoEcho: true
@@ -30,12 +27,10 @@ Parameters:
     Description: Name of the pre-existing S3 bucket for photo uploads
 
 Resources:
-  # ============================================
-  # 1. STORAGE (S3 & DynamoDB)
-  # ============================================
-  # NOTE: S3 bucket was created manually as eventsnap-uploads-anwesh2712.
-  # SAM references it via the ExistingBucketName parameter.
 
+  # ============================================
+  # 1. DYNAMODB TABLES
+  # ============================================
   EventRoomsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -61,7 +56,8 @@ Resources:
               KeyType: HASH
             - AttributeName: expiryDate
               KeyType: RANGE
-          Projection: ALL
+          Projection:
+            ProjectionType: ALL
       TimeToLiveSpecification:
         AttributeName: ttl
         Enabled: true
@@ -93,7 +89,8 @@ Resources:
               KeyType: HASH
             - AttributeName: roomId
               KeyType: RANGE
-          Projection: ALL
+          Projection:
+            ProjectionType: ALL
         - IndexName: hash-index
           KeySchema:
             - AttributeName: hash
@@ -121,7 +118,7 @@ Resources:
         Enabled: true
 
   # ============================================
-  # 2. AUTHENTICATION (Cognito + Custom Authorizer)
+  # 2. COGNITO USER POOL (Host Auth)
   # ============================================
   CognitoUserPool:
     Type: AWS::Cognito::UserPool
@@ -130,8 +127,15 @@ Resources:
       Policies:
         PasswordPolicy:
           MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+      AutoVerifiedAttributes:
+        - email
       Schema:
         - Name: email
+          AttributeDataType: String
           Required: true
           Mutable: true
 
@@ -146,7 +150,9 @@ Resources:
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_USER_PASSWORD_AUTH
 
-  # ----- CUSTOM GUEST AUTHORIZER (Lambda) -----
+  # ============================================
+  # 3. LAMBDA AUTHORIZER (Guest JWT)
+  # ============================================
   GuestAuthorizerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -157,7 +163,7 @@ Resources:
             TableName: !Ref EventRoomsTable
 
   # ============================================
-  # 3. API GATEWAY (REST API)
+  # 4. API GATEWAY
   # ============================================
   ApiGateway:
     Type: AWS::Serverless::Api
@@ -175,10 +181,9 @@ Resources:
         DefaultAuthorizer: CognitoAuthorizer
 
   # ============================================
-  # 4. LAMBDA FUNCTIONS (Handlers)
+  # 5. LAMBDA FUNCTIONS
   # ============================================
 
-  # --- A) Get Upload URL (Handles Pre-signed POST) ---
   GetUploadUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -199,7 +204,6 @@ Resources:
             Auth:
               Authorizer: GuestAuthorizer
 
-  # --- B) Rekognition Indexer (Triggered by S3) ---
   IndexFacesFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -216,12 +220,14 @@ Resources:
             TableName: !Ref RoomPhotosTable
         - DynamoDBReadPolicy:
             TableName: !Ref EventRoomsTable
-        - DynamoDBWritePolicy:
-            TableName: !Ref EventRoomsTable
         - S3ReadPolicy:
             BucketName: !Ref ExistingBucketName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: !GetAtt EventRoomsTable.Arn
 
-  # Allow S3 to invoke the IndexFaces Lambda
   IndexFacesS3Permission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -231,24 +237,11 @@ Resources:
       SourceArn: !Sub "arn:aws:s3:::${ExistingBucketName}"
       SourceAccount: !Ref AWS::AccountId
 
-  # Custom resource that wires the S3 notification to the Lambda
-  # (required because the bucket is pre-existing and not managed by this stack)
-  S3NotificationSetup:
-    Type: AWS::CloudFormation::CustomResource
-    DependsOn: IndexFacesS3Permission
-    Properties:
-      ServiceToken: !GetAtt S3NotificationFunction.Arn
-      BucketName: !Ref ExistingBucketName
-      LambdaArn: !GetAtt IndexFacesFunction.Arn
-
-  # Helper Lambda that sets/removes the S3 bucket notification on stack create/delete
   S3NotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/custom_resources/
       Handler: s3_notification.lambda_handler
-      Runtime: python3.11
-      Timeout: 30
       Policies:
         - Statement:
             - Effect: Allow
@@ -257,7 +250,14 @@ Resources:
                 - s3:GetBucketNotification
               Resource: !Sub "arn:aws:s3:::${ExistingBucketName}"
 
-  # --- C) Guest Search (Selfie Auth) ---
+  S3NotificationSetup:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: IndexFacesS3Permission
+    Properties:
+      ServiceToken: !GetAtt S3NotificationFunction.Arn
+      BucketName: !Ref ExistingBucketName
+      LambdaArn: !GetAtt IndexFacesFunction.Arn
+
   SearchFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -283,16 +283,13 @@ Resources:
             Auth:
               Authorizer: GuestAuthorizer
 
-  # --- D) Room CRUD (Host Only) ---
   RoomManagerFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/handlers/
       Handler: room_manager.lambda_handler
       Policies:
-        - DynamoDBWritePolicy:
-            TableName: !Ref EventRoomsTable
-        - DynamoDBReadPolicy:
+        - DynamoDBCrudPolicy:
             TableName: !Ref EventRoomsTable
       Events:
         ApiRooms:
@@ -312,7 +309,6 @@ Resources:
             Auth:
               Authorizer: CognitoAuthorizer
 
-  # --- E) Guest Token (No Auth — public entry point) ---
   GuestTokenFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -331,7 +327,6 @@ Resources:
             Auth:
               Authorizer: NONE
 
-  # --- F) Cleanup Scheduler (EventBridge) ---
   CleanupFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -357,11 +352,14 @@ Resources:
 
 Outputs:
   ApiGatewayUrl:
-    Description: "Base URL for the API"
+    Description: Base URL for the API
     Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
   CognitoClientId:
-    Description: "App Client ID for Frontend"
+    Description: App Client ID for Frontend
     Value: !Ref CognitoUserPoolClient
   UploadBucketName:
-    Description: "S3 Bucket for uploads"
+    Description: S3 Bucket for uploads
     Value: !Ref ExistingBucketName
