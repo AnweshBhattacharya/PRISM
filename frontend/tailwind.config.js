@@ -1,67 +1,97 @@
 /** @type {import('tailwindcss').Config} */
+
+// Small helper so every token supports Tailwind's opacity modifiers,
+// e.g. bg-bg/60, text-fg/80, border-line/50.
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
+// Every shade of a legacy hue collapses onto a single token, since the
+// accent is intentionally monochrome and status colors carry no scale.
+function fullShade(value) {
+  return {
+    50: value, 100: value, 200: value, 300: value, 400: value,
+    500: value, 600: value, 700: value, 800: value, 900: value, 950: value,
+  };
+}
+
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  darkMode: "class", // html.dark — runtime class toggle, instant + total
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
+    borderRadius: {
+      none: "0px",
+      full: "9999px", // reserved for the mobile FAB — the one exception
+      DEFAULT: "0px",
+    },
     extend: {
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-      },
       colors: {
-        // Primary brand — deep violet
-        brand: {
-          50:  '#f0f0ff',
-          100: '#e0e0ff',
-          200: '#c4b5fd',
-          300: '#a78bfa',
-          400: '#8b5cf6',
-          500: '#7c3aed',
-          600: '#6d28d9',
-          700: '#5b21b6',
-          800: '#4c1d95',
-          900: '#2e1065',
+        bg:         token("bg"),
+        surface:    token("surface"),
+        elevated:   token("elevated"),
+        fg:         token("fg"),
+        muted:      token("muted"),
+        faint:      token("faint"),
+        line:       token("line"),
+        accent:     token("accent"),
+        "accent-fg": token("accent-fg"),
+        success:    token("success"),
+        danger:     token("danger"),
+        warn:       token("warn"),
+
+        // ----------------------------------------------------------------
+        // Legacy Tailwind palette remap — components that still use
+        // slate/cyan/fuchsia/emerald/red/amber/black/white classes conform
+        // to the token set in both themes automatically.
+        // ----------------------------------------------------------------
+        slate: {
+          50: token("bg"),   100: token("bg"),   200: token("surface"),
+          300: token("line"), 400: token("line"), 500: token("faint"),
+          600: token("muted"), 700: token("muted"), 800: token("fg"),
+          900: token("fg"),  950: token("fg"),
         },
-        // Dark background palette
+        cyan:    fullShade(token("accent")),
+        fuchsia: fullShade(token("accent")),
+        emerald: fullShade(token("success")),
+        red:     fullShade(token("danger")),
+        amber:   fullShade(token("warn")),
+        black:   token("fg"),
+        white:   token("surface"),
+
+        // Legacy brand colors — map to accent
+        brand: fullShade(token("accent")),
         dark: {
-          900: '#0a0a0f',
-          800: '#111118',
-          700: '#1a1a27',
-          600: '#232335',
-          500: '#2d2d45',
-        },
-        // Accent — electric cyan
-        accent: {
-          400: '#22d3ee',
-          500: '#06b6d4',
-          600: '#0891b2',
+          900: token("bg"),
+          800: token("bg"),
+          700: token("surface"),
+          600: token("elevated"),
+          500: token("line"),
         },
       },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'hero-gradient': 'linear-gradient(135deg, #0a0a0f 0%, #1a1a27 50%, #0a0a0f 100%)',
+      fontFamily: {
+        display: ["var(--font-display)"],
+        sans:    ["var(--font-sans)"],
+        mono:    ["var(--font-mono)"],
       },
-      animation: {
-        'fade-in': 'fadeIn 0.5s ease-out',
-        'slide-up': 'slideUp 0.4s ease-out',
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'spin-slow': 'spin 2s linear infinite',
+      boxShadow: {
+        hard:      "var(--shadow-hard-x) var(--shadow-hard-y) 0 0 var(--shadow-hard-color)",
+        "hard-lift": "calc(var(--shadow-hard-x) + 1px) calc(var(--shadow-hard-y) + 1px) 0 0 var(--shadow-hard-color)",
       },
       keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
+        "fade-in":  { from: { opacity: 0 }, to: { opacity: 1 } },
+        pop:        { "0%": { opacity: 0, transform: "scale(0.94)" }, "100%": { opacity: 1, transform: "scale(1)" } },
+        "pop-in":   { "0%": { opacity: 0, transform: "scale(0.9) translateY(2px)" }, "100%": { opacity: 1, transform: "scale(1) translateY(0)" } },
+        "slide-up": { from: { opacity: 0, transform: "translateY(8px)" }, to: { opacity: 1, transform: "translateY(0)" } },
+        flash:      { "0%,100%": { backgroundColor: "transparent" }, "50%": { backgroundColor: "rgb(var(--accent) / 0.18)" } },
+        blink:      { "0%,100%": { opacity: 1 }, "50%": { opacity: 0 } },
       },
-      backdropBlur: {
-        xs: '2px',
+      animation: {
+        "fade-in":  "fade-in 0.18s ease both",
+        pop:        "pop 0.16s ease both",
+        "pop-in":   "pop-in 0.1s ease both",
+        "slide-up": "slide-up 0.2s ease both",
+        flash:      "flash 0.6s ease",
+        blink:      "blink 1s step-start infinite",
       },
     },
   },
   plugins: [],
-}
+};

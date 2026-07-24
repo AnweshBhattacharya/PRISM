@@ -1,7 +1,7 @@
 /**
  * components/PhotoCard.jsx
- * Displays a single matched photo with optional download button.
- * Shows a "Is this you?" badge for low-confidence matches.
+ * RawBlock v2 — square card with hard shadow, confidence tag, hover-reveal actions.
+ * Shows a "Is this you?" button for low-confidence matches.
  */
 export default function PhotoCard({ photo, allowDownload, onConfirm }) {
   const handleDownload = async () => {
@@ -19,54 +19,68 @@ export default function PhotoCard({ photo, allowDownload, onConfirm }) {
   }
 
   return (
-    <div className="group relative rounded-2xl overflow-hidden glass-hover aspect-square animate-fade-in">
+    <div className="group relative raw-card !p-0 overflow-hidden animate-fade-in" style={{ aspectRatio: '1 / 1' }}>
       {/* ── Photo ─────────────────────────────── */}
       <img
         src={photo.url}
         alt="Matched event photo"
-        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
         loading="lazy"
       />
 
-      {/* ── Overlay on hover ──────────────────── */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/0
-                      opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                      flex flex-col justify-end p-3 gap-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-white/60">
-            {Math.round(photo.confidence)}% match
+      {/* ── Confidence tag — top right ────────── */}
+      {!photo.needs_confirmation && (
+        <div className="absolute top-2 right-2">
+          <span
+            className="raw-tag text-xs"
+            style={{
+              background: 'rgb(var(--success) / 0.9)',
+              borderColor: 'rgb(var(--success))',
+              color: 'rgb(var(--surface))',
+            }}
+          >
+            ✓ {Math.round(photo.confidence)}%
           </span>
-          {allowDownload && (
-            <button
-              onClick={handleDownload}
-              className="text-xs bg-white/20 hover:bg-white/30 text-white px-2 py-1 rounded-lg transition-colors"
-              aria-label="Download photo"
-            >
-              ⬇ Save
-            </button>
-          )}
         </div>
-      </div>
+      )}
 
-      {/* ── "Is this you?" badge ──────────────── */}
+      {/* ── "Is this you?" banner — top ───────── */}
       {photo.needs_confirmation && (
-        <div className="absolute top-2 left-2 right-2">
+        <div className="absolute top-0 left-0 right-0">
           <button
             onClick={() => onConfirm?.(photo)}
-            className="w-full text-xs bg-yellow-500/90 hover:bg-yellow-400 text-black font-semibold
-                       px-2 py-1.5 rounded-lg backdrop-blur-sm transition-colors"
+            className="raw-btn w-full text-xs !min-h-0 !py-1.5 !px-2"
+            style={{
+              borderColor: 'rgb(var(--warn))',
+              color: 'rgb(var(--warn))',
+              background: 'rgb(var(--surface) / 0.95)',
+              boxShadow: 'none',
+            }}
           >
-            🤔 Is this you?
+            ? Is this you? — {Math.round(photo.confidence)}%
           </button>
         </div>
       )}
 
-      {/* ── Confidence pill ───────────────────── */}
-      {!photo.needs_confirmation && (
-        <div className="absolute top-2 right-2">
-          <span className="text-xs bg-green-500/80 text-white px-2 py-0.5 rounded-full backdrop-blur-sm">
-            ✓ {Math.round(photo.confidence)}%
-          </span>
+      {/* ── Hover overlay: Download button ────── */}
+      {allowDownload && (
+        <div
+          className="absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100
+                     transition-opacity duration-200 p-2"
+          style={{ background: 'rgb(var(--fg) / 0.7)' }}
+        >
+          <button
+            onClick={handleDownload}
+            className="raw-btn w-full text-xs !min-h-0 !py-1 !px-2"
+            style={{
+              background: 'rgb(var(--surface))',
+              color: 'rgb(var(--fg))',
+              boxShadow: 'none',
+            }}
+            aria-label="Download photo"
+          >
+            ⬇ Save
+          </button>
         </div>
       )}
     </div>

@@ -1,34 +1,18 @@
 /**
  * components/UploadZone.jsx
- * Drag-and-drop file upload zone using react-dropzone.
- * Supports multi-file selection, ZIP extraction, and shows a per-file progress list.
+ * RawBlock v2 — drag-and-drop zone with list-row file progress display.
+ * Supports multi-file selection, ZIP extraction.
  */
 import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import JSZip from 'jszip'
 
-const STATUS_STYLES = {
-  hashing:   'text-white/40',
-  uploading: 'text-accent-400',
-  done:      'text-green-400',
-  duplicate: 'text-yellow-400',
-  error:     'text-red-400',
-}
-
-const STATUS_ICONS = {
-  hashing:   '⏳',
-  uploading: '📤',
-  done:      '✅',
-  duplicate: '⚠️',
-  error:     '❌',
-}
-
 const STATUS_LABELS = {
-  hashing:   'Hashing…',
-  uploading: 'Uploading…',
-  done:      'Uploaded',
-  duplicate: 'Already uploaded',
-  error:     'Failed',
+  hashing:   'HASHING',
+  uploading: 'UPLOADING',
+  done:      'DONE',
+  duplicate: 'DUPLICATE',
+  error:     'FAILED',
 }
 
 export default function UploadZone({ uploads, onFilesSelected }) {
@@ -37,7 +21,6 @@ export default function UploadZone({ uploads, onFilesSelected }) {
 
     for (const file of acceptedFiles) {
       if (file.name.toLowerCase().endsWith('.zip')) {
-        // Extract images from ZIP
         try {
           const zip = await JSZip.loadAsync(file)
           for (const [name, entry] of Object.entries(zip.files)) {
@@ -61,10 +44,10 @@ export default function UploadZone({ uploads, onFilesSelected }) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: extractFiles,
     accept: {
-      'image/jpeg':  ['.jpg', '.jpeg'],
-      'image/png':   ['.png'],
-      'image/heic':  ['.heic'],
-      'image/webp':  ['.webp'],
+      'image/jpeg':      ['.jpg', '.jpeg'],
+      'image/png':       ['.png'],
+      'image/heic':      ['.heic'],
+      'image/webp':      ['.webp'],
       'application/zip': ['.zip'],
     },
     multiple: true,
@@ -75,48 +58,63 @@ export default function UploadZone({ uploads, onFilesSelected }) {
       {/* ── Drop Zone ────────────────────────────── */}
       <div
         {...getRootProps()}
-        className={`
-          relative rounded-2xl border-2 border-dashed p-10 text-center cursor-pointer
-          transition-all duration-300
-          ${isDragActive
-            ? 'border-brand-500 bg-brand-500/10 scale-[1.01]'
-            : 'border-white/10 hover:border-brand-500/50 hover:bg-white/[0.02]'
-          }
-        `}
         id="upload-dropzone"
+        className="border-2 border-dashed border-line cursor-pointer
+                   flex flex-col items-center justify-center gap-4
+                   p-10 text-center transition-colors duration-150"
+        style={{
+          aspectRatio: '16 / 9',
+          minHeight: '200px',
+          ...(isDragActive
+            ? {
+                borderColor: 'rgb(var(--accent))',
+                background: 'rgb(var(--accent) / 0.05)',
+              }
+            : {
+                background: 'rgb(var(--surface))',
+              }),
+        }}
       >
         <input {...getInputProps()} />
-        <div className="flex flex-col items-center gap-4">
-          <div className={`text-5xl transition-transform duration-200 ${isDragActive ? 'scale-125' : ''}`}>
-            {isDragActive ? '🎯' : '📁'}
-          </div>
-          <div>
-            <p className="text-lg font-semibold text-white/80">
-              {isDragActive ? 'Drop your photos here!' : 'Drag & drop photos or a ZIP file'}
-            </p>
-            <p className="text-sm text-white/40 mt-1">
-              or click to browse · JPEG, PNG, HEIC, WEBP, ZIP supported
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn-primary text-sm py-2 px-5 pointer-events-none"
-          >
-            Select Files
-          </button>
+
+        <span className="font-mono text-3xl text-faint select-none">
+          {isDragActive ? '▼' : '↑'}
+        </span>
+
+        <div>
+          <p className="font-sans font-semibold text-fg text-base">
+            {isDragActive ? 'Drop photos here' : 'Drag & drop photos or a ZIP'}
+          </p>
+          <p className="font-mono text-xs text-faint mt-1 uppercase tracking-wide">
+            JPEG · PNG · HEIC · WEBP · ZIP — click to browse
+          </p>
         </div>
+
+        <button
+          type="button"
+          className="raw-btn pointer-events-none text-sm"
+        >
+          Select Files
+        </button>
       </div>
 
       {/* ── Upload Progress List ──────────────────── */}
       {uploads.length > 0 && (
-        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+        <div
+          className="border border-line max-h-64 overflow-y-auto"
+          style={{ background: 'rgb(var(--surface))' }}
+        >
           {uploads.map((upload) => (
-            <div key={upload.id} className="glass rounded-xl p-3 flex items-center gap-3">
-              <span className="text-lg">{STATUS_ICONS[upload.status]}</span>
+            <div
+              key={upload.id}
+              className="list-row gap-3"
+            >
+              {/* Filename */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white/80 truncate">{upload.name}</p>
+                <p className="font-mono text-xs text-fg truncate">{upload.name}</p>
+                {/* Progress bar */}
                 {upload.status === 'uploading' && (
-                  <div className="progress-bar mt-1">
+                  <div className="progress-bar mt-1.5">
                     <div
                       className="progress-fill"
                       style={{ width: `${upload.progress}%` }}
@@ -124,7 +122,24 @@ export default function UploadZone({ uploads, onFilesSelected }) {
                   </div>
                 )}
               </div>
-              <span className={`text-xs font-medium whitespace-nowrap ${STATUS_STYLES[upload.status]}`}>
+
+              {/* Status tag */}
+              <span
+                className="raw-tag whitespace-nowrap flex-shrink-0"
+                style={{
+                  color:
+                    upload.status === 'done'      ? 'rgb(var(--success))' :
+                    upload.status === 'error'     ? 'rgb(var(--danger))'  :
+                    upload.status === 'duplicate' ? 'rgb(var(--warn))'    :
+                    upload.status === 'uploading' ? 'rgb(var(--accent))'  :
+                    'rgb(var(--faint))',
+                  borderColor:
+                    upload.status === 'done'      ? 'rgb(var(--success))' :
+                    upload.status === 'error'     ? 'rgb(var(--danger))'  :
+                    upload.status === 'duplicate' ? 'rgb(var(--warn))'    :
+                    undefined,
+                }}
+              >
                 {upload.status === 'uploading'
                   ? `${upload.progress}%`
                   : STATUS_LABELS[upload.status]}

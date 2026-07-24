@@ -38,7 +38,7 @@ export default function App() {
   return (
     <GuestProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-dark-900 flex flex-col">
+        <div className="min-h-screen bg-bg flex flex-col">
           <Navbar />
           <main className="flex-1">
             <Routes>

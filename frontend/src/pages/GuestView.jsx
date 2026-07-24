@@ -1,6 +1,6 @@
 /**
  * pages/GuestView.jsx
- * Allows guests to take a selfie and find all their photos in the event gallery.
+ * RawBlock v2 — Take a selfie, search the event gallery.
  * Flow: Consent → Webcam capture → POST /guest/search → display matched photos.
  */
 import { useState, useRef, useCallback } from 'react'
@@ -9,11 +9,11 @@ import Webcam from 'react-webcam'
 import { useGuest } from '../context/AuthContext'
 import { searchFaces } from '../services/api'
 import PhotoCard from '../components/PhotoCard'
-import LoadingSpinner from '../components/LoadingSpinner'
+import ConfirmModal from '../components/ConfirmModal'
 
 const WEBCAM_CONSTRAINTS = {
-  width: { ideal: 640 },
-  height: { ideal: 480 },
+  width:      { ideal: 640 },
+  height:     { ideal: 480 },
   facingMode: 'user',
 }
 
@@ -23,11 +23,11 @@ export default function GuestView() {
 
   const webcamRef = useRef(null)
 
-  const [step,         setStep]         = useState('consent') // consent | camera | loading | results | error
-  const [consent,      setConsent]      = useState(false)
-  const [photos,       setPhotos]       = useState([])
-  const [errorMsg,     setErrorMsg]     = useState('')
-  const [capturedImg,  setCapturedImg]  = useState(null)
+  const [step,        setStep]        = useState('consent') // consent | camera | loading | results | error
+  const [consent,     setConsent]     = useState(false)
+  const [photos,      setPhotos]      = useState([])
+  const [errorMsg,    setErrorMsg]    = useState('')
+  const [confirmPhoto, setConfirmPhoto] = useState(null)
 
   // Redirect if no valid guest session
   if (!guestSession || guestSession.roomId !== roomId) {
@@ -43,7 +43,6 @@ export default function GuestView() {
     const imageSrc = webcamRef.current?.getScreenshot()
     if (!imageSrc) return
 
-    setCapturedImg(imageSrc)
     setStep('loading')
 
     try {
@@ -58,42 +57,65 @@ export default function GuestView() {
   }, [])
 
   const handleRetry = () => {
-    setCapturedImg(null)
     setPhotos([])
     setErrorMsg('')
     setStep('camera')
   }
 
+  const handleConfirm = (photo) => {
+    setPhotos((prev) =>
+      prev.map((p) => p.photoId === photo.photoId ? { ...p, needs_confirmation: false } : p)
+    )
+    setConfirmPhoto(null)
+  }
+
+  const handleDeny = (photo) => {
+    setPhotos((prev) => prev.filter((p) => p.photoId !== photo.photoId))
+    setConfirmPhoto(null)
+  }
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12 page-enter">
-      {/* Header */}
-      <div className="mb-8 space-y-1">
-        <h1 className="text-3xl font-bold text-white">Find My Photos</h1>
-        <p className="text-white/50 text-sm">
-          Room: <span className="text-accent-400 font-mono">{guestSession.roomName || roomId}</span>
-        </p>
+    <div className="max-w-3xl mx-auto px-4 py-10 animate-slide-up">
+
+      {/* ── Header ── */}
+      <div className="mb-6">
+        <h1
+          className="font-display font-bold uppercase tracking-tight text-fg"
+          style={{ fontSize: 'clamp(1.75rem, 1.5rem + 1.5vw, 2.5rem)', lineHeight: 1.05 }}
+        >
+          Find My Photos
+        </h1>
+        <div className="flex items-center gap-3 mt-1">
+          <span className="font-mono text-xs text-faint uppercase tracking-wide">Room:</span>
+          <span className="font-mono text-xs text-fg">{guestSession.roomName || roomId}</span>
+        </div>
       </div>
 
       {/* ── Step 1: Consent ── */}
       {step === 'consent' && (
-        <div className="glass rounded-2xl p-8 space-y-6">
-          <div className="text-4xl text-center">🔍</div>
-          <div className="space-y-2 text-center">
-            <h2 className="text-xl font-bold text-white">Biometric Consent Required</h2>
-            <p className="text-white/50 text-sm max-w-md mx-auto">
-              To find your photos, we'll take a live selfie and use AI face recognition
-              to match it against the event gallery. Your selfie is never stored.
+        <div className="raw-card space-y-6">
+          <div>
+            <h2 className="font-display font-bold uppercase tracking-tight text-xl text-fg">
+              Biometric Consent
+            </h2>
+            <p className="font-mono text-xs text-faint uppercase tracking-wide mt-1">
+              Required before face recognition
             </p>
           </div>
 
-          <label className="flex items-start gap-3 cursor-pointer p-4 glass rounded-xl">
+          <p className="text-sm text-muted">
+            To find your photos, we'll take a live selfie and use AI face recognition
+            to match it against the event gallery. Your selfie is never stored.
+          </p>
+
+          <label className="flex items-start gap-3 cursor-pointer border border-line p-4">
             <input
               type="checkbox"
               checked={consent}
               onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 w-5 h-5 accent-brand-500 cursor-pointer"
+              className="raw-check mt-0.5"
             />
-            <span className="text-sm text-white/70">
+            <span className="text-sm text-muted">
               I consent to a one-time biometric face scan to find photos of myself
               in this event gallery. I understand my selfie image will not be stored.
             </span>
@@ -102,7 +124,7 @@ export default function GuestView() {
           <button
             onClick={handleConsentSubmit}
             disabled={!consent}
-            className="btn-primary w-full py-3 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="raw-btn raw-btn-accent w-full"
           >
             Continue to Camera →
           </button>
@@ -111,11 +133,13 @@ export default function GuestView() {
 
       {/* ── Step 2: Camera ── */}
       {step === 'camera' && (
-        <div className="glass rounded-2xl p-6 space-y-5">
-          <p className="text-center text-white/60 text-sm">
-            Position your face in the frame and tap the button
+        <div className="raw-card space-y-4">
+          <p className="font-mono text-xs text-muted uppercase tracking-wide text-center">
+            Position your face in the frame
           </p>
-          <div className="rounded-xl overflow-hidden aspect-video bg-dark-800 flex items-center justify-center">
+
+          {/* Webcam with hard border */}
+          <div className="border-2 border-line overflow-hidden" style={{ aspectRatio: '4/3' }}>
             <Webcam
               ref={webcamRef}
               audio={false}
@@ -125,10 +149,11 @@ export default function GuestView() {
               mirrored
             />
           </div>
-          <button onClick={handleCapture} className="btn-primary w-full py-3 text-lg">
-            📸 Take Selfie & Search
+
+          <button onClick={handleCapture} className="raw-btn raw-btn-accent w-full text-base">
+            Take Selfie & Search
           </button>
-          <button onClick={() => setStep('consent')} className="btn-secondary w-full text-sm">
+          <button onClick={() => setStep('consent')} className="raw-btn w-full text-sm">
             ← Back
           </button>
         </div>
@@ -136,35 +161,40 @@ export default function GuestView() {
 
       {/* ── Step 3: Loading ── */}
       {step === 'loading' && (
-        <div className="glass rounded-2xl p-16 flex flex-col items-center gap-4">
-          <LoadingSpinner size="lg" />
-          <p className="text-white/60">Searching the gallery…</p>
-          <p className="text-white/30 text-sm">This usually takes 2–4 seconds</p>
+        <div
+          className="border border-line bg-surface py-24 flex flex-col items-center gap-4"
+        >
+          <span
+            className="font-mono font-bold uppercase tracking-widest text-fg animate-blink"
+            style={{ fontSize: '1.5rem', letterSpacing: '0.2em' }}
+          >
+            SEARCHING...
+          </span>
+          <p className="font-mono text-xs text-faint uppercase tracking-wide">
+            Usually takes 2–4 seconds
+          </p>
         </div>
       )}
 
       {/* ── Step 4: Results ── */}
       {step === 'results' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/50 text-sm">
-                {photos.length > 0
-                  ? `Found ${photos.length} photo${photos.length !== 1 ? 's' : ''} with you in them`
-                  : 'No matching photos found'}
-              </p>
-            </div>
-            <button onClick={handleRetry} className="btn-secondary text-sm py-2 px-4">
-              🔄 Search Again
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <p className="font-mono text-xs text-faint uppercase tracking-wide">
+              {photos.length > 0
+                ? `${photos.length} photo${photos.length !== 1 ? 's' : ''} found`
+                : 'No matching photos found'}
+            </p>
+            <button onClick={handleRetry} className="raw-btn text-sm !py-1.5 !px-3">
+              Search Again
             </button>
           </div>
 
           {photos.length === 0 ? (
-            <div className="glass rounded-2xl p-16 text-center space-y-3">
-              <p className="text-4xl">🤷</p>
-              <p className="text-white/60">No photos found</p>
-              <p className="text-white/30 text-sm">
-                Photos may still be uploading. Try again in a few minutes.
+            <div className="border border-line bg-surface py-20 text-center space-y-3">
+              <p className="font-display font-bold uppercase text-2xl text-fg">No photos found</p>
+              <p className="font-mono text-xs text-faint uppercase tracking-wide">
+                Photos may still be uploading — try again in a few minutes
               </p>
             </div>
           ) : (
@@ -174,6 +204,7 @@ export default function GuestView() {
                   key={photo.photoId}
                   photo={photo}
                   allowDownload={guestSession.allowDownload}
+                  onConfirm={setConfirmPhoto}
                 />
               ))}
             </div>
@@ -183,13 +214,30 @@ export default function GuestView() {
 
       {/* ── Step 5: Error ── */}
       {step === 'error' && (
-        <div className="glass rounded-2xl p-8 space-y-4 text-center">
-          <p className="text-4xl">⚠️</p>
-          <p className="text-red-400">{errorMsg}</p>
-          <button onClick={handleRetry} className="btn-primary py-2 px-6">
+        <div
+          className="border border-line bg-surface px-6 py-10 space-y-4 text-center"
+          style={{ borderColor: 'rgb(var(--danger))' }}
+        >
+          <p
+            className="font-mono text-sm"
+            style={{ color: 'rgb(var(--danger))' }}
+          >
+            {errorMsg}
+          </p>
+          <button onClick={handleRetry} className="raw-btn raw-btn-accent">
             Try Again
           </button>
         </div>
+      )}
+
+      {/* ── Confirm Modal ── */}
+      {confirmPhoto && (
+        <ConfirmModal
+          photo={confirmPhoto}
+          onConfirm={handleConfirm}
+          onDeny={handleDeny}
+          onClose={() => setConfirmPhoto(null)}
+        />
       )}
     </div>
   )

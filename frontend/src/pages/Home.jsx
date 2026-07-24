@@ -1,8 +1,8 @@
 /**
  * pages/Home.jsx
- * Landing page with two CTAs:
- * - Guests enter a 6-digit room code to join an event.
- * - Hosts click "I'm a Host" to sign in via Cognito.
+ * RawBlock v2 — Landing page.
+ * Guest card: Room ID + 6-digit code + upload/view chips + submit.
+ * Host card: feature list + sign in button.
  */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -12,15 +12,15 @@ import { validateRoomCode } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function Home() {
-  const auth               = useAuth()
-  const { loginAsGuest }   = useGuest()
-  const navigate           = useNavigate()
+  const auth              = useAuth()
+  const { loginAsGuest }  = useGuest()
+  const navigate          = useNavigate()
 
-  const [roomId,      setRoomId]      = useState('')
-  const [accessCode,  setAccessCode]  = useState('')
-  const [error,       setError]       = useState('')
-  const [loading,     setLoading]     = useState(false)
-  const [action,      setAction]      = useState('upload') // 'upload' | 'view'
+  const [roomId,     setRoomId]     = useState('')
+  const [accessCode, setAccessCode] = useState('')
+  const [error,      setError]      = useState('')
+  const [loading,    setLoading]    = useState(false)
+  const [action,     setAction]     = useState('upload') // 'upload' | 'view'
 
   const handleGuestSubmit = async (e) => {
     e.preventDefault()
@@ -48,115 +48,153 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4 py-16 page-enter">
+    <div className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center px-4 py-16">
+
       {/* ── Hero ─────────────────────────────────────── */}
-      <div className="text-center max-w-2xl mx-auto mb-14 space-y-4">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-sm text-white/60 mb-2">
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse-slow" />
+      <div className="text-center max-w-2xl mx-auto mb-12 animate-slide-up" style={{ animationDelay: '0ms' }}>
+        <p className="font-mono text-xs text-faint uppercase tracking-widest mb-4">
           AI-Powered Event Photography
-        </div>
-        <h1 className="text-5xl sm:text-6xl font-extrabold leading-tight">
-          Your memories,{' '}
-          <span className="gradient-text">instantly found</span>
+        </p>
+        <h1
+          className="font-display font-bold uppercase text-fg"
+          style={{
+            fontSize: 'clamp(2.5rem, 2rem + 4vw, 4rem)',
+            lineHeight: 1.0,
+            letterSpacing: '-0.02em',
+          }}
+        >
+          Your memories,
+          <br />
+          instantly found
         </h1>
-        <p className="text-lg text-white/50 max-w-lg mx-auto">
+        <p className="mt-4 text-muted max-w-md mx-auto">
           Take a selfie. Our AI scans the entire event gallery and shows
           only the photos you appear in — privately and instantly.
         </p>
       </div>
 
       {/* ── Cards Row ────────────────────────────────── */}
-      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Guest Card */}
-        <div className="glass rounded-2xl p-8 space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold text-white">I'm a Guest 📸</h2>
-            <p className="text-sm text-white/50">Enter your event code to join</p>
+      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-0 md:gap-6">
+
+        {/* ── Guest Card ─────────────────────────── */}
+        <div
+          className="raw-card animate-slide-up"
+          style={{ animationDelay: '80ms' }}
+        >
+          <div className="mb-6">
+            <h2 className="font-display font-bold uppercase tracking-tight text-xl text-fg">
+              I'm a Guest
+            </h2>
+            <p className="font-mono text-xs text-faint uppercase tracking-wide mt-1">
+              Enter your event code to join
+            </p>
           </div>
 
           <form onSubmit={handleGuestSubmit} className="space-y-4">
+            {/* Room ID */}
             <div>
-              <label className="label" htmlFor="room-id-input">Room ID</label>
+              <label className="raw-label" htmlFor="room-id-input">Room ID</label>
               <input
                 id="room-id-input"
                 type="text"
                 placeholder="room_abc123"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
-                className="input-field"
+                className="raw-input"
                 required
               />
             </div>
+
+            {/* Access Code */}
             <div>
-              <label className="label" htmlFor="access-code-input">6-Digit Access Code</label>
+              <label className="raw-label" htmlFor="access-code-input">Access Code</label>
               <input
                 id="access-code-input"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]{6}"
                 maxLength={6}
-                placeholder="••••••"
+                placeholder="000000"
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, ''))}
-                className="input-field text-center text-2xl tracking-[0.5em] font-mono"
+                className="raw-input font-mono text-center text-2xl"
+                style={{ letterSpacing: '0.4em' }}
                 required
               />
             </div>
 
-            {/* Action toggle */}
-            <div className="flex gap-2 p-1 glass rounded-xl">
-              {['upload', 'view'].map((a) => (
+            {/* Action toggle chips */}
+            <div className="flex gap-2">
+              {[
+                { key: 'upload', label: 'Upload Photos' },
+                { key: 'view',   label: 'Find My Photos' },
+              ].map(({ key, label }) => (
                 <button
-                  key={a}
+                  key={key}
                   type="button"
-                  onClick={() => setAction(a)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                    action === a
-                      ? 'bg-brand-600 text-white shadow-lg'
-                      : 'text-white/50 hover:text-white'
-                  }`}
+                  onClick={() => setAction(key)}
+                  className={`raw-chip flex-1 justify-center ${action === key ? 'raw-chip-on' : ''}`}
                 >
-                  {a === 'upload' ? '📤 Upload Photos' : '🔍 Find My Photos'}
+                  {label}
                 </button>
               ))}
             </div>
 
+            {/* Error */}
             {error && (
-              <p className="text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2">
-                {error}
-              </p>
+              <div
+                className="border border-danger px-3 py-2"
+                style={{ color: 'rgb(var(--danger))', background: 'rgb(var(--danger) / 0.05)' }}
+              >
+                <p className="font-mono text-xs">{error}</p>
+              </div>
             )}
 
             <button
               id="guest-submit-btn"
               type="submit"
               disabled={loading}
-              className="btn-primary w-full py-3"
+              className="raw-btn raw-btn-accent w-full"
             >
-              {loading ? <LoadingSpinner size="sm" /> : (
+              {loading ? (
+                <LoadingSpinner size="sm" label="JOINING..." />
+              ) : (
                 action === 'upload' ? 'Join & Upload →' : 'Join & Find Photos →'
               )}
             </button>
           </form>
         </div>
 
-        {/* Host Card */}
-        <div className="glass rounded-2xl p-8 flex flex-col justify-between space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold text-white">I'm a Host 🎉</h2>
-            <p className="text-sm text-white/50">Create and manage your event rooms</p>
+        {/* ── Host Card ──────────────────────────── */}
+        <div
+          className="raw-card flex flex-col justify-between animate-slide-up mt-6 md:mt-0"
+          style={{ animationDelay: '160ms' }}
+        >
+          <div className="mb-6">
+            <h2 className="font-display font-bold uppercase tracking-tight text-xl text-fg">
+              I'm a Host
+            </h2>
+            <p className="font-mono text-xs text-faint uppercase tracking-wide mt-1">
+              Create and manage event rooms
+            </p>
           </div>
 
-          <ul className="space-y-3 text-sm text-white/60">
+          {/* Feature list */}
+          <ul className="space-y-3 mb-8">
             {[
               'Create private event rooms with a 6-digit code',
               'Guests upload photos directly and securely',
               'AI automatically organises photos by face',
               'Rooms auto-delete after your chosen expiry date',
             ].map((feat) => (
-              <li key={feat} className="flex items-start gap-2">
-                <span className="text-brand-400 mt-0.5">✓</span>
-                {feat}
+              <li key={feat} className="flex items-start gap-3">
+                <span
+                  className="font-mono text-xs flex-shrink-0 mt-0.5"
+                  style={{ color: 'rgb(var(--success))' }}
+                >
+                  ✓
+                </span>
+                <span className="text-sm text-muted">{feat}</span>
               </li>
             ))}
           </ul>
@@ -164,7 +202,7 @@ export default function Home() {
           <button
             id="host-login-btn"
             onClick={() => auth.signinRedirect()}
-            className="btn-primary w-full py-3"
+            className="raw-btn raw-btn-accent w-full"
           >
             Sign In / Create Account →
           </button>

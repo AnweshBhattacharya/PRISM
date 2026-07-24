@@ -1,18 +1,22 @@
-/** components/LoadingSpinner.jsx — Reusable animated spinner */
+/**
+ * components/LoadingSpinner.jsx
+ * RawBlock v2 — no spinners.
+ * Uses a blinking mono text indicator instead.
+ */
 export default function LoadingSpinner({ size = 'md', label }) {
-  const sizes = {
-    sm: 'w-4 h-4 border-2',
-    md: 'w-8 h-8 border-2',
-    lg: 'w-12 h-12 border-3',
+  const textSizes = {
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-base',
   }
+
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div
-        className={`${sizes[size]} rounded-full border-white/10 border-t-brand-500 animate-spin`}
-        role="status"
-        aria-label="Loading"
-      />
-      {label && <p className="text-sm text-white/50 animate-pulse">{label}</p>}
+    <div className="flex flex-col items-center gap-2" role="status" aria-label="Loading">
+      <span
+        className={`font-mono font-bold uppercase tracking-widest text-fg animate-blink ${textSizes[size]}`}
+      >
+        {label || 'LOADING...'}
+      </span>
     </div>
   )
 }
