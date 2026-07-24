@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: EventSnap - Production Serverless Backend (Prism v2)
+Description: Prism - AI-powered event photo gallery
 
 Globals:
   Function:
@@ -123,7 +123,7 @@ Resources:
   CognitoUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: EventSnap-Hosts
+      UserPoolName: Prism-Hosts
       Policies:
         PasswordPolicy:
           MinimumLength: 8
@@ -143,21 +143,25 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       UserPoolId: !Ref CognitoUserPool
-      ClientName: eventsnap-web
+      ClientName: prism-web
       GenerateSecret: false
       ExplicitAuthFlows:
         - ALLOW_USER_SRP_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_USER_PASSWORD_AUTH
 
-  # ============================================
-  # 3. LAMBDA AUTHORIZER (Guest JWT)
-  # ============================================
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub "prism-auth-${AWS::AccountId}"
+      UserPoolId: !Ref CognitoUserPool
+
+
   GuestAuthorizerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/authorizers/
-      Handler: guest_authorizer.lambda_handler
+      CodeUri: backend/
+      Handler: authorizers.guest_authorizer.lambda_handler
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref EventRoomsTable
@@ -182,13 +186,14 @@ Resources:
 
   # ============================================
   # 5. LAMBDA FUNCTIONS
+  # All use CodeUri: backend/ so utils/ is included in the package
   # ============================================
 
   GetUploadUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/handlers/
-      Handler: upload_url.lambda_handler
+      CodeUri: backend/
+      Handler: handlers.upload_url.lambda_handler
       Policies:
         - S3WritePolicy:
             BucketName: !Ref ExistingBucketName
@@ -207,8 +212,8 @@ Resources:
   IndexFacesFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/handlers/
-      Handler: index_faces.lambda_handler
+      CodeUri: backend/
+      Handler: handlers.index_faces.lambda_handler
       Policies:
         - Statement:
             - Effect: Allow
@@ -240,8 +245,8 @@ Resources:
   S3NotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/custom_resources/
-      Handler: s3_notification.lambda_handler
+      CodeUri: backend/
+      Handler: custom_resources.s3_notification.lambda_handler
       Policies:
         - Statement:
             - Effect: Allow
@@ -261,8 +266,8 @@ Resources:
   SearchFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/handlers/
-      Handler: search.lambda_handler
+      CodeUri: backend/
+      Handler: handlers.search.lambda_handler
       Policies:
         - Statement:
             - Effect: Allow
@@ -286,8 +291,8 @@ Resources:
   RoomManagerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/handlers/
-      Handler: room_manager.lambda_handler
+      CodeUri: backend/
+      Handler: handlers.room_manager.lambda_handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref EventRoomsTable
@@ -312,8 +317,8 @@ Resources:
   GuestTokenFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/handlers/
-      Handler: guest_token.lambda_handler
+      CodeUri: backend/
+      Handler: handlers.guest_token.lambda_handler
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref EventRoomsTable
@@ -330,8 +335,8 @@ Resources:
   CleanupFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/handlers/
-      Handler: cleanup.lambda_handler
+      CodeUri: backend/
+      Handler: handlers.cleanup.lambda_handler
       Policies:
         - S3FullAccessPolicy:
             BucketName: !Ref ExistingBucketName
