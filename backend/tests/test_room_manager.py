@@ -2,13 +2,12 @@
 tests/test_room_manager.py
 
 Tests for room CRUD operations using moto to mock AWS services.
-Written BEFORE implementation per TDD guidelines.
 """
 import json
 import os
 import pytest
 import boto3
-from moto import mock_dynamodb
+from moto import mock_aws
 
 # Set environment variables before importing handlers
 os.environ["ROOMS_TABLE"] = "EventRooms"
@@ -16,6 +15,7 @@ os.environ["PHOTOS_TABLE"] = "RoomPhotos"
 os.environ["SESSIONS_TABLE"] = "GuestSessions"
 os.environ["BUCKET_NAME"] = "test-bucket"
 os.environ["REKOGNITION_COLLECTION"] = "eventsnap-faces"
+os.environ["GUEST_JWT_SECRET"] = "test-secret"
 os.environ["AWS_DEFAULT_REGION"] = "ap-south-1"
 os.environ["AWS_ACCESS_KEY_ID"] = "testing"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
@@ -66,7 +66,7 @@ def _make_event(method, path, body=None, host_id="host_abc"):
     }
 
 
-@mock_dynamodb
+@mock_aws
 def test_create_room_success():
     """A valid room creation returns 201 with roomId and accessCode."""
     import importlib
@@ -87,7 +87,7 @@ def test_create_room_success():
     assert body["accessCode"].isdigit()
 
 
-@mock_dynamodb
+@mock_aws
 def test_create_room_missing_name():
     """A room creation without a name returns 400."""
     import importlib
@@ -103,7 +103,7 @@ def test_create_room_missing_name():
     assert response["statusCode"] == 400
 
 
-@mock_dynamodb
+@mock_aws
 def test_create_room_invalid_expiry():
     """Expiry days outside 1-30 range returns 400."""
     import importlib
@@ -119,7 +119,7 @@ def test_create_room_invalid_expiry():
     assert response["statusCode"] == 400
 
 
-@mock_dynamodb
+@mock_aws
 def test_list_rooms_returns_host_rooms():
     """List rooms returns only rooms belonging to the authenticated host."""
     import importlib
@@ -142,7 +142,7 @@ def test_list_rooms_returns_host_rooms():
     assert rooms[0]["name"] == "Event A"
 
 
-@mock_dynamodb
+@mock_aws
 def test_delete_room_wrong_host():
     """A host cannot delete a room they don't own — returns 403."""
     import importlib

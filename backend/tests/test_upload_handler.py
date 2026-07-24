@@ -6,14 +6,14 @@ Uses moto to mock S3 and DynamoDB.
 """
 import json
 import os
-import pytest
 import boto3
-from moto import mock_dynamodb, mock_s3
+from moto import mock_aws
 
 os.environ["ROOMS_TABLE"] = "EventRooms"
 os.environ["PHOTOS_TABLE"] = "RoomPhotos"
 os.environ["BUCKET_NAME"] = "test-bucket"
 os.environ["REKOGNITION_COLLECTION"] = "eventsnap-faces"
+os.environ["GUEST_JWT_SECRET"] = "test-secret"
 os.environ["AWS_DEFAULT_REGION"] = "ap-south-1"
 os.environ["AWS_ACCESS_KEY_ID"] = "testing"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
@@ -70,15 +70,13 @@ def _make_upload_event(file_hash=VALID_HASH, content_type="image/jpeg", room_id=
     }
 
 
-@mock_dynamodb
-@mock_s3
+@mock_aws
 def test_upload_url_success():
     """A valid request returns a 200 with a pre-signed URL."""
     import importlib
     import handlers.upload_url as uu
     importlib.reload(uu)
 
-    boto3.resource("dynamodb", region_name="ap-south-1")
     _create_photos_table(boto3.resource("dynamodb", region_name="ap-south-1"))
     s3 = boto3.client("s3", region_name="ap-south-1")
     s3.create_bucket(
@@ -96,8 +94,7 @@ def test_upload_url_success():
     assert "photoId" in body
 
 
-@mock_dynamodb
-@mock_s3
+@mock_aws
 def test_upload_url_duplicate_rejected():
     """A duplicate file hash in the same room returns 409 Conflict."""
     import importlib
@@ -126,8 +123,7 @@ def test_upload_url_duplicate_rejected():
     assert response["statusCode"] == 409
 
 
-@mock_dynamodb
-@mock_s3
+@mock_aws
 def test_upload_url_invalid_content_type():
     """An unsupported content type returns 400."""
     import importlib
@@ -145,8 +141,7 @@ def test_upload_url_invalid_content_type():
     assert response["statusCode"] == 400
 
 
-@mock_dynamodb
-@mock_s3
+@mock_aws
 def test_upload_url_invalid_hash_length():
     """A file hash that is not 64 characters long returns 400."""
     import importlib
