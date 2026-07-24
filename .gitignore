@@ -35,5 +35,8 @@ samconfig.toml
 .DS_Store
 Thumbs.db
 
+# ── Documentation (kept local only) ──────────────
+*.md
+
 # ── History folder (demo files, not source) ───────
 history/
