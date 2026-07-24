@@ -241,17 +241,68 @@ Resources:
             TableName: !Ref EventRoomsTable
         - S3ReadPolicy:
             BucketName: !Ref ExistingBucketName
-      Events:
-        S3Event:
-          Type: S3
-          Properties:
-            Bucket: !Ref ExistingBucketName
-            Events: s3:ObjectCreated:*
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: uploads/
+
+  # Allow S3 to invoke the IndexFaces Lambda
+  IndexFacesS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt IndexFacesFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub "arn:aws:s3:::${ExistingBucketName}"
+      SourceAccount: !Ref AWS::AccountId
+
+  # Custom resource that wires the S3 notification to the Lambda
+  # (required because the bucket is pre-existing and not managed by this stack)
+  S3NotificationSetup:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: IndexFacesS3Permission
+    Properties:
+      ServiceToken: !GetAtt S3NotificationFunction.Arn
+      BucketName: !Ref ExistingBucketName
+      LambdaArn: !GetAtt IndexFacesFunction.Arn
+
+  # Helper Lambda that sets/removes the S3 bucket notification on stack create/delete
+  S3NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+        import boto3, cfnresponse, json
+        def handler(event, context):
+          s3 = boto3.client('s3')
+          bucket = event['ResourceProperties']['BucketName']
+          lambda_arn = event['ResourceProperties']['LambdaArn']
+          try:
+            if event['RequestType'] == 'Delete':
+              s3.put_bucket_notification_configuration(
+                Bucket=bucket,
+                NotificationConfiguration={}
+              )
+            else:
+              s3.put_bucket_notification_configuration(
+                Bucket=bucket,
+                NotificationConfiguration={
+                  'LambdaFunctionConfigurations': [{
+                    'LambdaFunctionArn': lambda_arn,
+                    'Events': ['s3:ObjectCreated:*'],
+                    'Filter': {'Key': {'FilterRules': [{'Name': 'prefix', 'Value': 'uploads/'}]}}
+                  }]
+                }
+              )
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+          except Exception as e:
+            print(e)
+            cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+      Handler: index.handler
+      Runtime: python3.11
+      Timeout: 30
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutBucketNotification
+                - s3:GetBucketNotification
+              Resource: !Sub "arn:aws:s3:::${ExistingBucketName}"
 
   # --- C) Guest Search (Selfie Auth) ---
   SearchFunction:
