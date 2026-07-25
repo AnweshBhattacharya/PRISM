@@ -488,6 +488,12 @@
     50%      { opacity: 0; }
   }
 
+  @keyframes letter-drop {
+    0%   { opacity: 0; transform: translateY(-10px); }
+    60%  { opacity: 1; transform: translateY(2px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
   .animate-fade-in  { animation: fade-in 0.18s ease both; }
   .animate-pop      { animation: pop 0.16s ease both; }
   .animate-pop-in   { animation: pop-in 0.1s ease both; }
