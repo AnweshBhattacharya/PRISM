@@ -25,7 +25,7 @@ from utils.helpers import build_response, build_error, hash_access_code, get_env
 dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "ap-south-1"))
 
 # This secret MUST match what the guest_authorizer uses to validate tokens.
-GUEST_JWT_SECRET = os.environ.get("GUEST_JWT_SECRET", "changeme-in-production")
+GUEST_JWT_SECRET = get_env("GUEST_JWT_SECRET")
 TOKEN_EXPIRY_SECONDS = 3600  # 1 hour
 
 

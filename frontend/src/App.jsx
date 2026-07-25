@@ -3,6 +3,7 @@ import { useAuth } from 'react-oidc-context'
 import { GuestProvider } from './context/AuthContext'
 
 import Home          from './pages/Home'
+import Login         from './pages/Login'
 import HostDashboard from './pages/HostDashboard'
 import GuestUpload   from './pages/GuestUpload'
 import GuestView     from './pages/GuestView'
@@ -43,7 +44,8 @@ export default function App() {
           <main className="flex-1">
             <Routes>
               {/* ── Public Routes ─────────────────────── */}
-              <Route path="/"                    element={<Home />} />
+              <Route path="/"       element={<Home />} />
+              <Route path="/login"  element={<Login />} />
 
               {/* ── Guest Routes (guest JWT auth) ─────── */}
               <Route path="/room/:roomId/upload" element={<GuestUpload />} />

@@ -40,7 +40,7 @@ def lambda_handler(event, context):
         return _create_room(event, host_id)
     elif http_method == "GET" and path == "/rooms":
         return _list_rooms(host_id)
-    elif http_method == "DELETE" and "roomId" in path_params:
+    elif http_method == "DELETE" and path_params.get("roomId"):
         return _delete_room(path_params["roomId"], host_id)
     else:
         return build_error(404, "Route not found.")

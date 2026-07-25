@@ -316,13 +316,23 @@ export default function Home() {
               </ul>
             </div>
 
-            <button
-              id="host-login-btn"
-              onClick={() => navigate('/login')}
-              className="raw-btn raw-btn-accent w-full"
-            >
-              Sign In →
-            </button>
+            {auth.isAuthenticated ? (
+              <button
+                id="host-dashboard-btn"
+                onClick={() => navigate('/dashboard')}
+                className="raw-btn raw-btn-accent w-full"
+              >
+                Go to Dashboard →
+              </button>
+            ) : (
+              <button
+                id="host-login-btn"
+                onClick={() => navigate('/login')}
+                className="raw-btn raw-btn-accent w-full"
+              >
+                Sign In →
+              </button>
+            )}
           </div>
         </div>
       </section>
