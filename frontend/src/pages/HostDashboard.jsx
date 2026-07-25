@@ -351,7 +351,7 @@ export default function HostDashboard() {
                       }}
                       title="Show and copy access code"
                     >
-                      {shareRoomId === room.roomId ? '✓ Code shown' : 'Share'}
+                      {shareRoomId === room.roomId ? 'Code shown' : 'Share'}
                     </button>
 
                     {/* Inline copy feedback */}
