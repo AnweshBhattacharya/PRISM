@@ -147,11 +147,8 @@ Resources:
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_USER_PASSWORD_AUTH
 
-  CognitoUserPoolDomain:
-    Type: AWS::Cognito::UserPoolDomain
-    Properties:
-      Domain: !Sub "prism-auth-${AWS::AccountId}"
-      UserPoolId: !Ref CognitoUserPool
+  # NOTE: CognitoUserPoolDomain (prism-auth-098139608966) was created manually
+  # and is already attached to this pool. Managed outside CloudFormation.
 
   # ============================================
   # 3. GUEST AUTHORIZER
