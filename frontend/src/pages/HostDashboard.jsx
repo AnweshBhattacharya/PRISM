@@ -4,7 +4,9 @@
  * Rooms displayed as list-row items. Stats in mono font. Hard-shadow cards.
  */
 import { useState, useEffect } from 'react'
-import { listRooms, createRoom, deleteRoom } from '../services/api'
+import { useNavigate } from 'react-router-dom'
+import { listRooms, createRoom, deleteRoom, validateRoomCode } from '../services/api'
+import { useGuest } from '../context/AuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 /* ── Create Room Modal ──────────────────────────────────────────────────── */
@@ -174,13 +176,17 @@ function CreateRoomModal({ onClose, onCreated }) {
 
 /* ── Main Dashboard ──────────────────────────────────────────────────────── */
 export default function HostDashboard() {
+  const navigate = useNavigate()
+  const { loginAsGuest } = useGuest()
+
   const [rooms,      setRooms]      = useState([])
   const [loading,    setLoading]    = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
-  const [shareRoomId, setShareRoomId] = useState(null)  // Track which room's share menu is open
-  const [copied,     setCopied]     = useState(false)   // Show "Copied!" feedback
+  const [shareRoomId, setShareRoomId] = useState(null)
+  const [copied,     setCopied]     = useState(false)
+  const [enteringRoomId, setEnteringRoomId] = useState(null)  // Track which room is being entered
 
   const loadRooms = async () => {
     try {
@@ -213,6 +219,28 @@ export default function HostDashboard() {
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleEnterRoom = async (room) => {
+    if (!room.accessCode) {
+      console.error('Access code not available')
+      return
+    }
+
+    setEnteringRoomId(room.roomId)
+    try {
+      // Authenticate as guest using the room code
+      const data = await validateRoomCode(room.roomId, room.accessCode)
+      // Store guest session
+      loginAsGuest(room.roomId, data)
+      // Redirect to upload page
+      navigate(`/room/${room.roomId}/upload`)
+    } catch (err) {
+      console.error('Failed to enter room:', err)
+      alert('Could not enter room. Please try again.')
+    } finally {
+      setEnteringRoomId(null)
+    }
   }
 
   const isExpired = (expiryDate) => new Date(expiryDate) < new Date()
@@ -341,6 +369,25 @@ export default function HostDashboard() {
                       </button>
                     )}
                   </div>
+
+                  {/* Enter Room button (test as guest) */}
+                  <button
+                    onClick={() => handleEnterRoom(room)}
+                    disabled={enteringRoomId === room.roomId || expired}
+                    className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
+                    style={{
+                      borderColor: expired ? 'rgb(var(--faint) / 0.3)' : 'rgb(var(--success) / 0.5)',
+                      color: expired ? 'rgb(var(--faint))' : 'rgb(var(--success))',
+                      opacity: expired ? 0.5 : 1,
+                    }}
+                    title="Test the guest experience"
+                  >
+                    {enteringRoomId === room.roomId ? (
+                      <LoadingSpinner size="sm" label="..." />
+                    ) : (
+                      '→ Enter'
+                    )}
+                  </button>
 
                   {/* Delete: inline confirm state */}
                   {isConfirming ? (
