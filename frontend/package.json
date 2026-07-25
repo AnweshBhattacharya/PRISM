@@ -10,15 +10,16 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "amazon-cognito-identity-js": "^6.3.20",
+    "axios": "^1.7.4",
+    "jszip": "^3.10.1",
+    "oidc-client-ts": "^3.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0",
-    "axios": "^1.7.4",
-    "react-oidc-context": "^3.2.0",
-    "oidc-client-ts": "^3.0.1",
-    "react-webcam": "^7.2.0",
     "react-dropzone": "^14.2.9",
-    "jszip": "^3.10.1"
+    "react-oidc-context": "^3.2.0",
+    "react-router-dom": "^6.26.0",
+    "react-webcam": "^7.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
