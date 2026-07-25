@@ -89,5 +89,4 @@ jobs:
             --region ap-south-1 \
             --debug \
             --parameter-overrides \
-              GuestJwtSecret=${{ secrets.GUEST_JWT_SECRET }} \
-              ExistingBucketName=eventsnap-uploads-anwesh2712
+              GuestJwtSecret=${{ secrets.GUEST_JWT_SECRET }} 
