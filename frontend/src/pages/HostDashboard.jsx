@@ -179,6 +179,8 @@ export default function HostDashboard() {
   const [showCreate, setShowCreate] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [shareRoomId, setShareRoomId] = useState(null)  // Track which room's share menu is open
+  const [copied,     setCopied]     = useState(false)   // Show "Copied!" feedback
 
   const loadRooms = async () => {
     try {
@@ -204,6 +206,13 @@ export default function HostDashboard() {
     } finally {
       setDeletingId(null)
     }
+  }
+
+  const handleShare = (room) => {
+    const text = `${room.name}\n\nRoom Code: ${room.accessCode}\nRoom ID: ${room.roomId}`
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const isExpired = (expiryDate) => new Date(expiryDate) < new Date()
@@ -259,7 +268,7 @@ export default function HostDashboard() {
             const isConfirming = confirmDeleteId === room.roomId
 
             return (
-              <div key={room.roomId} className="list-row flex-wrap gap-y-3">
+              <div key={room.roomId} className="list-row flex-wrap gap-y-3 group">
                 {/* Room info */}
                 <div className="flex-1 min-w-0 mr-4">
                   <div className="flex items-center gap-3 flex-wrap">
@@ -280,6 +289,13 @@ export default function HostDashboard() {
                     </span>
                   </div>
                   <p className="font-mono text-xs text-faint mt-0.5 truncate">{room.roomId}</p>
+                  {/* Show access code on hover/expand */}
+                  {shareRoomId === room.roomId && (
+                    <div className="mt-2 p-2 border border-line bg-surface/50 rounded text-xs space-y-1">
+                      <p className="text-faint">Access Code:</p>
+                      <p className="font-mono font-bold text-lg text-accent tracking-widest">{room.accessCode}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Stats */}
@@ -293,6 +309,37 @@ export default function HostDashboard() {
                       {new Date(room.expiryDate).toLocaleDateString('en-IN')}
                     </p>
                     <p className="font-mono text-xs text-faint uppercase tracking-wide">Expires</p>
+                  </div>
+
+                  {/* Share button with copy to clipboard */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShareRoomId(shareRoomId === room.roomId ? null : room.roomId)}
+                      className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
+                      style={{
+                        borderColor: 'rgb(var(--accent) / 0.5)',
+                        color: 'rgb(var(--accent))',
+                        background: shareRoomId === room.roomId ? 'rgb(var(--accent) / 0.1)' : 'transparent',
+                      }}
+                      title="Show and copy access code"
+                    >
+                      {shareRoomId === room.roomId ? '✓ Code shown' : '📤 Share'}
+                    </button>
+
+                    {/* Inline copy feedback */}
+                    {shareRoomId === room.roomId && (
+                      <button
+                        onClick={() => handleShare(room)}
+                        className="ml-2 raw-btn !px-3 !py-1 !min-h-0 text-xs"
+                        style={{
+                          background: copied ? 'rgb(var(--success) / 0.2)' : 'rgb(var(--accent) / 0.1)',
+                          borderColor: copied ? 'rgb(var(--success))' : 'rgb(var(--accent))',
+                          color: copied ? 'rgb(var(--success))' : 'rgb(var(--accent))',
+                        }}
+                      >
+                        {copied ? '✓ Copied' : '📋 Copy'}
+                      </button>
+                    )}
                   </div>
 
                   {/* Delete: inline confirm state */}

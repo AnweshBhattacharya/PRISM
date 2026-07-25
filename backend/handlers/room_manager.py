@@ -79,7 +79,8 @@ def _create_room(event, host_id: str) -> dict:
                 "SK": "METADATA",
                 "hostId": host_id,
                 "roomName": room_name,
-                "accessCodeHash": hashed_code,
+                "accessCode": raw_access_code,  # Store plain code for host retrieval
+                "accessCodeHash": hashed_code,  # Keep hash for guest validation
                 "expiryDate": expiry_iso,
                 "allowDownload": allow_download,
                 "ttl": expiry_timestamp,
@@ -106,6 +107,7 @@ def _list_rooms(host_id: str) -> dict:
     """
     Lists all rooms owned by the authenticated host.
     Uses the hostId-index GSI for an efficient O(1) query.
+    Includes the 6-digit access code for sharing with guests.
     """
     try:
         table = dynamodb.Table(get_env("ROOMS_TABLE"))
@@ -117,6 +119,7 @@ def _list_rooms(host_id: str) -> dict:
             {
                 "roomId": item["PK"].replace("ROOM#", ""),
                 "name": item.get("roomName"),
+                "accessCode": item.get("accessCode", ""),  # 6-digit code
                 "photoCount": int(item.get("photoCount", 0)),
                 "expiryDate": item.get("expiryDate"),
                 "allowDownload": item.get("allowDownload", True),
