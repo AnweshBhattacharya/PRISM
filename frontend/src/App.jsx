@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from 'react-oidc-context'
+import { useEffect } from 'react'
+import { setHostToken } from './services/api'
 import { GuestProvider } from './context/AuthContext'
 
 import Home          from './pages/Home'
@@ -9,6 +11,26 @@ import GuestUpload   from './pages/GuestUpload'
 import GuestView     from './pages/GuestView'
 import Navbar        from './components/Navbar'
 import LoadingSpinner from './components/LoadingSpinner'
+
+/**
+ * OidcTokenSync — sync the Cognito ID token to the API layer
+ * whenever the user authenticates or the token refreshes.
+ */
+function OidcTokenSync() {
+  const auth = useAuth()
+
+  useEffect(() => {
+    if (auth.isAuthenticated && auth.user?.id_token) {
+      // Set the ID token (without Bearer prefix) for Cognito User Pool authorizer
+      setHostToken(auth.user.id_token)
+    } else {
+      // Clear token if logged out
+      setHostToken(null)
+    }
+  }, [auth.isAuthenticated, auth.user?.id_token])
+
+  return null
+}
 
 /**
  * ProtectedRoute — wraps host-only pages.
@@ -40,6 +62,7 @@ export default function App() {
     <GuestProvider>
       <BrowserRouter>
         <div className="min-h-screen bg-bg flex flex-col">
+          <OidcTokenSync />
           <Navbar />
           <main className="flex-1">
             <Routes>

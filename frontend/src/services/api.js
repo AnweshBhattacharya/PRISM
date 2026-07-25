@@ -11,13 +11,30 @@ const API = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// ── Store for host token (set by App.jsx via setHostToken) ─────────────────
+let currentHostToken = null
+
+export const setHostToken = (token) => {
+  currentHostToken = token
+}
+
 // ── Request Interceptor: attach auth token ─────────────────────────────────
 API.interceptors.request.use((config) => {
-  // Try guest token first (sessionStorage), then Cognito token (localStorage)
+  // Try guest token first (sessionStorage), then Cognito ID token
   const guestToken = sessionStorage.getItem('guestToken')
-  const hostToken  = localStorage.getItem('hostToken')
-  const token = guestToken || hostToken
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  const token = guestToken || currentHostToken
+
+  if (token) {
+    // For guest tokens: send as "Bearer ${token}"
+    // For Cognito ID tokens: send as raw token (no Bearer prefix)
+    if (guestToken) {
+      config.headers.Authorization = `Bearer ${token}`
+    } else {
+      // Cognito User Pool authorizer expects raw token (no Bearer prefix)
+      config.headers.Authorization = token
+    }
+  }
+
   return config
 })
 
