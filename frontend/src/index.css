@@ -535,6 +535,8 @@
   .animate-slide-right { animation: slide-in-right 0.35s cubic-bezier(0.16,1,0.3,1) both; }
   .animate-flash     { animation: flash 0.6s ease; }
   .animate-blink     { animation: blink 1s step-start infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.001ms !important;
       animation-iteration-count: 1 !important;
