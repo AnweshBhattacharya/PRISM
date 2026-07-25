@@ -351,7 +351,7 @@ export default function HostDashboard() {
                       }}
                       title="Show and copy access code"
                     >
-                      {shareRoomId === room.roomId ? '✓ Code shown' : '📤 Share'}
+                      {shareRoomId === room.roomId ? '✓ Code shown' : 'Share'}
                     </button>
 
                     {/* Inline copy feedback */}
@@ -365,7 +365,7 @@ export default function HostDashboard() {
                           color: copied ? 'rgb(var(--success))' : 'rgb(var(--accent))',
                         }}
                       >
-                        {copied ? '✓ Copied' : '📋 Copy'}
+                        {copied ? '✓ Copied' : 'Copy'}
                       </button>
                     )}
                   </div>
@@ -385,7 +385,7 @@ export default function HostDashboard() {
                     {enteringRoomId === room.roomId ? (
                       <LoadingSpinner size="sm" label="..." />
                     ) : (
-                      '→ Enter'
+                      'Enter'
                     )}
                   </button>
 

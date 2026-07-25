@@ -96,7 +96,7 @@ export const uploadToS3 = (presignedData, file, onProgress) => {
   formData.append('file', file)
 
   return axios.post(presignedData.url, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    // Let the browser set the Content-Type with the auto-generated boundary!
     onUploadProgress: (e) => {
       if (onProgress && e.total) {
         onProgress(Math.round((e.loaded * 100) / e.total))
