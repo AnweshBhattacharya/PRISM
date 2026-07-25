@@ -13,7 +13,7 @@ Globals:
         PHOTOS_TABLE: !Ref RoomPhotosTable
         SESSIONS_TABLE: !Ref GuestSessionsTable
         REKOGNITION_COLLECTION: eventsnap-faces
-        BUCKET_NAME: !Ref ExistingBucketName
+        BUCKET_NAME: "eventsnap-uploads-anwesh2712"        # hardcoded
         GUEST_JWT_SECRET: !Ref GuestJwtSecret
 
 Parameters:
@@ -21,10 +21,7 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Secret used to sign and verify guest JWTs
-  ExistingBucketName:
-    Type: String
-    Default: eventsnap-uploads-anwesh2712
-    Description: Name of the pre-existing S3 bucket for photo uploads
+  # ExistingBucketName removed – now hardcoded
 
 Resources:
 
@@ -156,7 +153,9 @@ Resources:
       Domain: !Sub "prism-auth-${AWS::AccountId}"
       UserPoolId: !Ref CognitoUserPool
 
-
+  # ============================================
+  # 3. GUEST AUTHORIZER
+  # ============================================
   GuestAuthorizerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -196,7 +195,7 @@ Resources:
       Handler: handlers.upload_url.lambda_handler
       Policies:
         - S3WritePolicy:
-            BucketName: !Ref ExistingBucketName
+            BucketName: "eventsnap-uploads-anwesh2712"    # hardcoded
         - DynamoDBReadPolicy:
             TableName: !Ref RoomPhotosTable
       Events:
@@ -226,7 +225,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref EventRoomsTable
         - S3ReadPolicy:
-            BucketName: !Ref ExistingBucketName
+            BucketName: "eventsnap-uploads-anwesh2712"    # hardcoded
         - Statement:
             - Effect: Allow
               Action:
@@ -239,7 +238,7 @@ Resources:
       FunctionName: !GetAtt IndexFacesFunction.Arn
       Action: lambda:InvokeFunction
       Principal: s3.amazonaws.com
-      SourceArn: !Sub "arn:aws:s3:::${ExistingBucketName}"
+      SourceArn: !Sub "arn:aws:s3:::eventsnap-uploads-anwesh2712"   # hardcoded
       SourceAccount: !Ref AWS::AccountId
 
   S3NotificationFunction:
@@ -253,14 +252,14 @@ Resources:
               Action:
                 - s3:PutBucketNotification
                 - s3:GetBucketNotification
-              Resource: !Sub "arn:aws:s3:::${ExistingBucketName}"
+              Resource: !Sub "arn:aws:s3:::eventsnap-uploads-anwesh2712"   # hardcoded
 
   S3NotificationSetup:
     Type: AWS::CloudFormation::CustomResource
     DependsOn: IndexFacesS3Permission
     Properties:
       ServiceToken: !GetAtt S3NotificationFunction.Arn
-      BucketName: !Ref ExistingBucketName
+      BucketName: "eventsnap-uploads-anwesh2712"      # hardcoded
       LambdaArn: !GetAtt IndexFacesFunction.Arn
 
   SearchFunction:
@@ -277,7 +276,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref RoomPhotosTable
         - S3ReadPolicy:
-            BucketName: !Ref ExistingBucketName
+            BucketName: "eventsnap-uploads-anwesh2712"   # hardcoded
       Events:
         Api:
           Type: Api
@@ -339,7 +338,7 @@ Resources:
       Handler: handlers.cleanup.lambda_handler
       Policies:
         - S3FullAccessPolicy:
-            BucketName: !Ref ExistingBucketName
+            BucketName: "eventsnap-uploads-anwesh2712"   # hardcoded
         - DynamoDBReadPolicy:
             TableName: !Ref EventRoomsTable
         - DynamoDBWritePolicy:
@@ -367,4 +366,4 @@ Outputs:
     Value: !Ref CognitoUserPoolClient
   UploadBucketName:
     Description: S3 Bucket for uploads
-    Value: !Ref ExistingBucketName
+    Value: "eventsnap-uploads-anwesh2712"   # hardcoded
