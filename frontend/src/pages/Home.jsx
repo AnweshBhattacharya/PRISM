@@ -11,14 +11,13 @@ import { useGuest } from '../context/AuthContext'
 import { validateRoomCode } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 
-/* ── Drifting vertical lines + scan line (light mode only) ────────── */
+/* ── Drifting vertical lines + scan line ─────────────────────────── */
 function GeometricBackground() {
   const canvasRef = useRef(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    if (document.documentElement.classList.contains('dark')) return
 
     const ctx = canvas.getContext('2d')
     let raf
@@ -34,6 +33,10 @@ function GeometricBackground() {
     const lineCount = 12
 
     function draw() {
+      const isDark = document.documentElement.classList.contains('dark')
+      const lineColor = isDark ? '244,245,247' : '10,10,12'
+      const lineOpacity = isDark ? 0.04 : 0.06
+
       const { width: w, height: h } = canvas
       ctx.clearRect(0, 0, w, h)
 
@@ -43,10 +46,10 @@ function GeometricBackground() {
         const x      = ((i * gap + offset) + w * 10) % w
 
         const g = ctx.createLinearGradient(x, 0, x, h)
-        g.addColorStop(0,   'rgba(10,10,12,0)')
-        g.addColorStop(0.3, 'rgba(10,10,12,0.06)')
-        g.addColorStop(0.7, 'rgba(10,10,12,0.06)')
-        g.addColorStop(1,   'rgba(10,10,12,0)')
+        g.addColorStop(0,   `rgba(${lineColor},0)`)
+        g.addColorStop(0.3, `rgba(${lineColor},${lineOpacity})`)
+        g.addColorStop(0.7, `rgba(${lineColor},${lineOpacity})`)
+        g.addColorStop(1,   `rgba(${lineColor},0)`)
 
         ctx.beginPath()
         ctx.strokeStyle = g
@@ -56,11 +59,12 @@ function GeometricBackground() {
         ctx.stroke()
       }
 
+      const scanOpacity = isDark ? 0.03 : 0.04
       const scanY = (t * 18) % h
       const sg = ctx.createLinearGradient(0, scanY - 40, 0, scanY + 40)
-      sg.addColorStop(0,   'rgba(10,10,12,0)')
-      sg.addColorStop(0.5, 'rgba(10,10,12,0.04)')
-      sg.addColorStop(1,   'rgba(10,10,12,0)')
+      sg.addColorStop(0,   `rgba(${lineColor},0)`)
+      sg.addColorStop(0.5, `rgba(${lineColor},${scanOpacity})`)
+      sg.addColorStop(1,   `rgba(${lineColor},0)`)
       ctx.fillStyle = sg
       ctx.fillRect(0, scanY - 40, w, 80)
 

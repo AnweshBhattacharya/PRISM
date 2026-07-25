@@ -85,6 +85,9 @@
     background: rgb(var(--bg));
     color: rgb(var(--fg));
     min-height: 100vh;
+    /* Subtle dot grid texture */
+    background-image: radial-gradient(rgb(var(--line) / 0.6) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 
   ::selection {
@@ -205,6 +208,11 @@
     min-height: 44px;
   }
   .raw-input:focus-visible {
+    border-color: rgb(var(--accent));
+    box-shadow: 2px 2px 0 0 var(--shadow-hard-color);
+    outline: none;
+  }
+  .raw-input:focus {
     border-color: rgb(var(--accent));
     box-shadow: 2px 2px 0 0 var(--shadow-hard-color);
   }
