@@ -21,7 +21,6 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Secret used to sign and verify guest JWTs
-  # ExistingBucketName removed – now hardcoded
 
 Resources:
 
@@ -182,6 +181,10 @@ Resources:
     Type: AWS::Serverless::Api
     Properties:
       StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'http://localhost:5173'"
       Auth:
         Authorizers:
           CognitoAuthorizer:
@@ -192,6 +195,7 @@ Resources:
               Headers:
                 - Authorization
         DefaultAuthorizer: CognitoAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
 
   # ============================================
   # 5. LAMBDA FUNCTIONS
@@ -306,20 +310,44 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref EventRoomsTable
       Events:
-        ApiRooms:
+        ApiRoomsGet:
           Type: Api
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /rooms
-            Method: ANY
+            Method: GET
             Auth:
               Authorizer: CognitoAuthorizer
-        ApiRoomsById:
+        ApiRoomsPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /rooms
+            Method: POST
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ApiRoomsByIdGet:
           Type: Api
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /rooms/{roomId}
-            Method: ANY
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ApiRoomsByIdPut:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /rooms/{roomId}
+            Method: PUT
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ApiRoomsByIdDelete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /rooms/{roomId}
+            Method: DELETE
             Auth:
               Authorizer: CognitoAuthorizer
 
