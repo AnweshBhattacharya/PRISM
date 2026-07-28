@@ -16,10 +16,11 @@ import LoadingSpinner from '../components/LoadingSpinner'
 function buildShareText({ roomId, accessCode, roomName }) {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   return [
-    roomName ? `${roomName} — Prism photo room` : 'Prism photo room',
+    `Hey! Your friend used Prism to send you the pictures`,
     origin,
+    `Room Name: ${roomName || 'Untitled Room'}`,
     `Room ID: ${roomId}`,
-    `Access Code: ${accessCode}`,
+    `Access Code: ${accessCode}`
   ].join('\n')
 }
 
