@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from 'react-oidc-context'
 import { listRooms, createRoom, deleteRoom, validateRoomCode } from '../services/api'
 import { useGuest } from '../context/AuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -91,7 +92,7 @@ function CreateRoomModal({ onClose, onCreated }) {
                   } : {}}
                   aria-pressed={allowDownload}
                 >
-                  {allowDownload ? '✓ ON' : 'OFF'}
+                  {allowDownload ? 'On' : 'Off'}
                 </button>
                 <span className="text-sm text-muted">Allow guests to download photos</span>
               </div>
@@ -116,7 +117,8 @@ function CreateRoomModal({ onClose, onCreated }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="raw-btn raw-btn-accent flex-1"
+                  className="raw-btn raw-btn-accent flex-1 focus-ticks transition-transform duration-150
+                             hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
                 >
                   {loading ? <LoadingSpinner size="sm" label="CREATING..." /> : 'Create Room'}
                 </button>
@@ -160,7 +162,7 @@ function CreateRoomModal({ onClose, onCreated }) {
                   background: 'rgb(var(--warn) / 0.05)',
                 }}
               >
-                ⚠ Save this code — it won't be shown again
+                Note: Save this code — it won't be shown again
               </p>
             </div>
 
@@ -199,7 +201,13 @@ export default function HostDashboard() {
     }
   }
 
-  useEffect(() => { loadRooms() }, [])
+  const auth = useAuth()
+
+  // Load rooms once the host auth token is available. This ensures listRooms
+  // has the correct authorization header after redirect/login flows.
+  useEffect(() => {
+    if (auth.isAuthenticated) loadRooms()
+  }, [auth.isAuthenticated])
 
   const handleDeleteConfirm = async (roomId) => {
     setDeletingId(roomId)
@@ -222,22 +230,17 @@ export default function HostDashboard() {
   }
 
   const handleEnterRoom = async (room) => {
-    if (!room.accessCode) {
-      console.error('Access code not available')
+    if (!room.roomId) {
+      console.error('Room ID not available')
       return
     }
 
     setEnteringRoomId(room.roomId)
     try {
-      // Authenticate as guest using the room code
-      const data = await validateRoomCode(room.roomId, room.accessCode)
-      // Store guest session
-      loginAsGuest(room.roomId, data)
-      // Redirect to upload page
-      navigate(`/room/${room.roomId}/upload`)
+      navigate(`/dashboard/rooms/${room.roomId}`)
     } catch (err) {
-      console.error('Failed to enter room:', err)
-      alert('Could not enter room. Please try again.')
+      console.error('Failed to open room:', err)
+      alert('Could not open room. Please try again.')
     } finally {
       setEnteringRoomId(null)
     }
@@ -260,13 +263,14 @@ export default function HostDashboard() {
           <p className="font-mono text-xs text-faint uppercase tracking-wide mt-1">
             {rooms.length} room{rooms.length !== 1 ? 's' : ''}
           </p>
+          <p className="font-mono text-xs text-faint mt-2">Use "Enter" to view photos; use "Upload" to open the upload page.</p>
         </div>
         <button
           id="create-room-btn"
           onClick={() => setShowCreate(true)}
-          className="raw-btn raw-btn-accent"
+          className="raw-btn raw-btn-accent focus-ticks transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
         >
-          + Create Room
+          Create Room
         </button>
       </div>
 
@@ -296,7 +300,7 @@ export default function HostDashboard() {
             const isConfirming = confirmDeleteId === room.roomId
 
             return (
-              <div key={room.roomId} className="list-row flex-wrap gap-y-3 group">
+              <div key={room.roomId} className="list-row flex-wrap gap-y-3 group transition-transform duration-150 hover:-translate-y-1 hover:shadow-sm">
                 {/* Room info */}
                 <div className="flex-1 min-w-0 mr-4">
                   <div className="flex items-center gap-3 flex-wrap">
@@ -365,29 +369,39 @@ export default function HostDashboard() {
                           color: copied ? 'rgb(var(--success))' : 'rgb(var(--accent))',
                         }}
                       >
-                        {copied ? '✓ Copied' : 'Copy'}
+                        {copied ? 'Copied' : 'Copy'}
                       </button>
                     )}
                   </div>
 
                   {/* Enter Room button (test as guest) */}
-                  <button
-                    onClick={() => handleEnterRoom(room)}
-                    disabled={enteringRoomId === room.roomId || expired}
-                    className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
-                    style={{
-                      borderColor: expired ? 'rgb(var(--faint) / 0.3)' : 'rgb(var(--success) / 0.5)',
-                      color: expired ? 'rgb(var(--faint))' : 'rgb(var(--success))',
-                      opacity: expired ? 0.5 : 1,
-                    }}
-                    title="Test the guest experience"
-                  >
-                    {enteringRoomId === room.roomId ? (
-                      <LoadingSpinner size="sm" label="..." />
-                    ) : (
-                      'Enter'
-                    )}
-                  </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEnterRoom(room)}
+                        disabled={enteringRoomId === room.roomId || expired}
+                        className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
+                        style={{
+                          borderColor: expired ? 'rgb(var(--faint) / 0.3)' : 'rgb(var(--success) / 0.5)',
+                          color: expired ? 'rgb(var(--faint))' : 'rgb(var(--success))',
+                          opacity: expired ? 0.5 : 1,
+                        }}
+                        title="View all uploaded photos for this room"
+                      >
+                        {enteringRoomId === room.roomId ? (
+                          <LoadingSpinner size="sm" label="..." />
+                        ) : (
+                          'Enter'
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => navigate(`/room/${room.roomId}/upload`)}
+                        className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
+                        title="Open upload view as a guest"
+                      >
+                        Upload
+                      </button>
+                    </div>
 
                   {/* Delete: inline confirm state */}
                   {isConfirming ? (

@@ -553,3 +553,53 @@
     }
   }
 }
+
+/* --------------------------------------------------------------------------
+   focus-ticks.css — keyboard focus corner-bracket treatment
+   Add class .focus-ticks to interactive elements with position: relative.
+   -------------------------------------------------------------------------- */
+.focus-ticks {
+  position: relative;
+  outline: none;
+}
+
+.focus-ticks::before,
+.focus-ticks::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgb(var(--accent));
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.focus-ticks::before {
+  top: -6px;
+  left: -6px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.focus-ticks::after {
+  bottom: -6px;
+  right: -6px;
+  border-left: none;
+  border-top: none;
+}
+
+.focus-ticks:focus-visible::before,
+.focus-ticks:focus-visible::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .focus-ticks::before,
+  .focus-ticks::after {
+    transition: none;
+  }
+}

@@ -17,6 +17,34 @@ const WEBCAM_CONSTRAINTS = {
   facingMode: 'user',
 }
 
+// Camera-viewfinder corner brackets, drawn over the webcam feed. Each corner
+// gently pulses on its own delay so the frame reads as "actively focusing"
+// rather than a static overlay.
+function FocusBrackets() {
+  const corners = [
+    { top: 0,    left: 0,   borderWidth: '3px 0 0 3px' },
+    { top: 0,    right: 0,  borderWidth: '3px 3px 0 0' },
+    { bottom: 0, left: 0,   borderWidth: '0 0 3px 3px' },
+    { bottom: 0, right: 0,  borderWidth: '0 3px 3px 0' },
+  ]
+  return (
+    <div className="pointer-events-none absolute inset-4" aria-hidden="true">
+      {corners.map((style, i) => (
+        <div
+          key={i}
+          className="absolute w-7 h-7 animate-focus-pulse"
+          style={{
+            ...style,
+            borderStyle: 'solid',
+            borderColor: 'rgb(var(--accent))',
+            animationDelay: `${i * 150}ms`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function GuestView() {
   const { roomId }       = useParams()
   const { guestSession } = useGuest()
@@ -124,7 +152,8 @@ export default function GuestView() {
           <button
             onClick={handleConsentSubmit}
             disabled={!consent}
-            className="raw-btn raw-btn-accent w-full"
+            className="raw-btn raw-btn-accent w-full focus-ticks transition-transform duration-150
+                       hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
           >
             Continue to Camera →
           </button>
@@ -138,8 +167,11 @@ export default function GuestView() {
             Position your face in the frame
           </p>
 
-          {/* Webcam with hard border */}
-          <div className="border-2 border-line overflow-hidden" style={{ aspectRatio: '4/3' }}>
+          {/* Webcam with hard border + animated focus brackets */}
+          <div
+            className="relative border-2 border-line overflow-hidden transition-transform duration-150 hover:-translate-y-0.5"
+            style={{ aspectRatio: '4/3' }}
+          >
             <Webcam
               ref={webcamRef}
               audio={false}
@@ -148,9 +180,14 @@ export default function GuestView() {
               className="w-full h-full object-cover"
               mirrored
             />
+            <FocusBrackets />
           </div>
 
-          <button onClick={handleCapture} className="raw-btn raw-btn-accent w-full text-base">
+          <button
+            onClick={handleCapture}
+            className="raw-btn raw-btn-accent w-full text-base focus-ticks transition-transform duration-150
+                       hover:-translate-y-0.5 active:translate-y-0"
+          >
             Take Selfie & Search
           </button>
           <button onClick={() => setStep('consent')} className="raw-btn w-full text-sm">

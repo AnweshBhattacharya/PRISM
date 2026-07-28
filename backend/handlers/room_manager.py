@@ -21,12 +21,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.helpers import build_response, build_error, hash_access_code, generate_id, get_env
 
 dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "ap-south-1"))
+s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "ap-south-1"))
 
 
 def lambda_handler(event, context):
     """Route incoming API Gateway requests to the correct handler."""
     http_method = event.get("httpMethod", "")
-    path = event.get("path", "")
+    # Prefer the API resource template when available, since ApiGateway events may
+    # include the stage prefix in event.path (e.g. /prod/rooms).
+    path = event.get("resource") or event.get("path") or ""
+    if not path.startswith("/"):
+        path = f"/{path}"
     path_params = event.get("pathParameters") or {}
 
     # Extract Host ID from the Cognito authorizer claims
@@ -40,9 +45,14 @@ def lambda_handler(event, context):
         return _create_room(event, host_id)
     elif http_method == "GET" and path == "/rooms":
         return _list_rooms(host_id)
+    elif http_method == "GET" and path == "/rooms/{roomId}/photos":
+        return _get_room_photos(path_params.get("roomId"), host_id)
     elif http_method == "DELETE" and path_params.get("roomId"):
         return _delete_room(path_params["roomId"], host_id)
+    elif http_method == "PUT" and path_params.get("roomId"):
+        return _update_room(event, path_params["roomId"], host_id)
     else:
+        print(f"[RoomManager] Unhandled route: method={http_method} path={path} resource={event.get('resource')} pathParameters={path_params}")
         return build_error(404, "Route not found.")
 
 
@@ -130,6 +140,68 @@ def _list_rooms(host_id: str) -> dict:
     except Exception as e:
         print(f"[ListRooms] Error: {e}")
         return build_error(500, "Failed to list rooms.")
+
+
+# ─────────────────────────────────────────────
+# GET ROOM PHOTOS  GET /rooms/{roomId}/photos
+# ─────────────────────────────────────────────
+
+def _get_room_photos(room_id: str, host_id: str) -> dict:
+    """
+    Returns pre-signed URLs for all photos in a room.
+    Only the room owner can access this host-only endpoint.
+    """
+    try:
+        table = dynamodb.Table(get_env("ROOMS_TABLE"))
+        response = table.get_item(Key={"PK": f"ROOM#{room_id}", "SK": "METADATA"})
+        item = response.get("Item")
+
+        if not item:
+            return build_error(404, "Room not found.")
+        if item.get("hostId") != host_id:
+            return build_error(403, "Forbidden: You do not own this room.")
+
+        photos_table = dynamodb.Table(get_env("PHOTOS_TABLE"))
+        photos_response = photos_table.query(
+            KeyConditionExpression=Key("PK").eq(f"ROOM#{room_id}") & Key("SK").begins_with("PHOTO#"),
+        )
+
+        bucket_name = get_env("BUCKET_NAME")
+        photos = []
+        for photo_item in photos_response.get("Items", []):
+            s3_key = photo_item.get("s3Key")
+            if not s3_key:
+                continue
+
+            try:
+                presigned_url = s3_client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": bucket_name, "Key": s3_key},
+                    ExpiresIn=900,
+                )
+            except Exception as e:
+                print(f"[GetRoomPhotos] Failed to create presigned URL for {s3_key}: {e}")
+                continue
+
+            photos.append({
+                "photoId": photo_item.get("photoId"),
+                "url": presigned_url,
+                "confidence": float(photo_item.get("confidence", 0.0)) if photo_item.get("confidence") else 0.0,
+                "needs_confirmation": False,
+                "s3Key": s3_key,
+                "isBlurry": photo_item.get("isBlurry", False),
+                "photoCount": int(photo_item.get("photoCount", 0)),
+            })
+
+        return build_response(200, {
+            "roomId": room_id,
+            "roomName": item.get("roomName"),
+            "allowDownload": item.get("allowDownload", True),
+            "photos": photos,
+        })
+    except Exception as e:
+        print(f"[GetRoomPhotos] Error: {e}")
+        return build_error(500, "Failed to fetch room photos.")
 
 
 # ─────────────────────────────────────────────

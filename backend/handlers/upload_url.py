@@ -84,6 +84,7 @@ def lambda_handler(event, context):
                 {"x-amz-meta-roomid": room_id},
                 {"x-amz-meta-photoid": photo_id},
                 {"x-amz-meta-hash": file_hash},
+                {"x-amz-meta-session": session_token or ""},
             ],
             ExpiresIn=300,  # 5 minutes
         )

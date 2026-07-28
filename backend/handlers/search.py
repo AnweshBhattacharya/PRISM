@@ -105,6 +105,9 @@ def lambda_handler(event, context):
 
             for item in response.get("Items", []):
                 photo_id = item.get("photoId")
+                if not photo_id:
+                    continue
+
                 existing_confidence = matched_photos.get(photo_id, {}).get("confidence", 0)
                 # Keep the highest confidence score for each photo
                 if similarity > existing_confidence:
@@ -112,6 +115,18 @@ def lambda_handler(event, context):
                         "confidence": similarity,
                         "s3Key": item.get("s3Key", ""),
                     }
+
+        # Fallback: if the face index entry does not carry s3Key, fetch the photo record.
+        for photo_id, photo_data in list(matched_photos.items()):
+            if photo_data.get("s3Key"):
+                continue
+
+            photo_item = photos_table.get_item(
+                Key={"PK": f"ROOM#{room_id}", "SK": f"PHOTO#{photo_id}"},
+            ).get("Item", {})
+            s3_key = photo_item.get("s3Key", "")
+            if s3_key:
+                matched_photos[photo_id]["s3Key"] = s3_key
 
         if not matched_photos:
             return build_response(200, {"photos": [], "message": "No matching photos found in this room."})

@@ -29,7 +29,10 @@ rekognition = boto3.client("rekognition", region_name=os.environ.get("AWS_REGION
 dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "ap-south-1"))
 
 # Minimum face quality confidence threshold
-MIN_CONFIDENCE = 70.0
+# Lowered from 70.0 to 60.0 to reduce false negatives during indexing.
+# This increases recall at the cost of potential false positives (acceptable
+# for a photo-sharing app where hosts prefer more matches).
+MIN_CONFIDENCE = 60.0
 # Rekognition collection to index faces into
 COLLECTION_ID = os.environ.get("REKOGNITION_COLLECTION", "eventsnap-faces")
 
@@ -122,6 +125,7 @@ def _process_photo(bucket: str, key: str):
                     "faceId": face_id,
                     "roomId": room_id,
                     "photoId": photo_id,
+                    "s3Key": key,
                     "confidence": str(round(confidence, 4)),
                     "ttl": room_ttl,
                 }

@@ -5,8 +5,8 @@ import { setHostToken } from './services/api'
 import { GuestProvider } from './context/AuthContext'
 
 import Home          from './pages/Home'
-import Login         from './pages/Login'
 import HostDashboard from './pages/HostDashboard'
+import HostRoomView  from './pages/HostRoomView'
 import GuestUpload   from './pages/GuestUpload'
 import GuestView     from './pages/GuestView'
 import Navbar        from './components/Navbar'
@@ -68,7 +68,6 @@ export default function App() {
             <Routes>
               {/* ── Public Routes ─────────────────────── */}
               <Route path="/"       element={<Home />} />
-              <Route path="/login"  element={<Login />} />
 
               {/* ── Guest Routes (guest JWT auth) ─────── */}
               <Route path="/room/:roomId/upload" element={<GuestUpload />} />
@@ -80,6 +79,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <HostDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard/rooms/:roomId"
+                element={
+                  <ProtectedRoute>
+                    <HostRoomView />
                   </ProtectedRoute>
                 }
               />

@@ -13,7 +13,7 @@ Globals:
         PHOTOS_TABLE: !Ref RoomPhotosTable
         SESSIONS_TABLE: !Ref GuestSessionsTable
         REKOGNITION_COLLECTION: eventsnap-faces
-        BUCKET_NAME: "eventsnap-uploads-anwesh2712"        # hardcoded
+        BUCKET_NAME: !Ref UploadBucketName
         GUEST_JWT_SECRET: !Ref GuestJwtSecret
 
 Parameters:
@@ -21,6 +21,23 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Secret used to sign and verify guest JWTs
+  UploadBucketName:
+    Type: String
+    Default: eventsnap-uploads-anwesh2712
+    Description: >
+      Name of the existing S3 bucket used for direct photo uploads.
+      This bucket is provisioned outside of this stack (see PROJECT_GUIDE.md);
+      override this parameter at deploy time if the bucket name changes
+      or the stack is deployed under a different account/environment.
+  FrontendUrl:
+    Type: String
+    Default: http://localhost:5173
+    Description: >
+      Origin of the deployed frontend (e.g. the Amplify app URL, no trailing
+      slash). Used for API Gateway CORS and as the Cognito OAuth callback/
+      logout URL, since the frontend's redirect_uri resolves to
+      window.location.origin at runtime. Override at deploy time once the
+      Amplify domain (or custom domain) is known.
 
 Resources:
 
@@ -153,9 +170,9 @@ Resources:
         - phone
       AllowedOAuthFlowsUserPoolClient: true
       CallbackURLs:
-        - http://localhost:5173
+        - !Ref FrontendUrl
       LogoutURLs:
-        - http://localhost:5173
+        - !Ref FrontendUrl
       SupportedIdentityProviders:
         - COGNITO
 
@@ -184,7 +201,7 @@ Resources:
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,Authorization'"
-        AllowOrigin: "'http://localhost:5173'"
+        AllowOrigin: !Sub "'${FrontendUrl}'"
       Auth:
         Authorizers:
           CognitoAuthorizer:
@@ -196,6 +213,24 @@ Resources:
                 - Authorization
         DefaultAuthorizer: CognitoAuthorizer
         AddDefaultAuthorizerToCorsPreflight: false
+
+  ApiGatewayUnauthorizedResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResponseType: UNAUTHORIZED
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${FrontendUrl}'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+
+  ApiGatewayAccessDeniedResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResponseType: ACCESS_DENIED
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${FrontendUrl}'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
 
   # ============================================
   # 5. LAMBDA FUNCTIONS
@@ -209,7 +244,7 @@ Resources:
       Handler: handlers.upload_url.lambda_handler
       Policies:
         - S3WritePolicy:
-            BucketName: "eventsnap-uploads-anwesh2712"    # hardcoded
+            BucketName: !Ref UploadBucketName
         - DynamoDBReadPolicy:
             TableName: !Ref RoomPhotosTable
       Events:
@@ -239,7 +274,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref EventRoomsTable
         - S3ReadPolicy:
-            BucketName: "eventsnap-uploads-anwesh2712"    # hardcoded
+            BucketName: !Ref UploadBucketName
         - Statement:
             - Effect: Allow
               Action:
@@ -252,7 +287,7 @@ Resources:
       FunctionName: !GetAtt IndexFacesFunction.Arn
       Action: lambda:InvokeFunction
       Principal: s3.amazonaws.com
-      SourceArn: !Sub "arn:aws:s3:::eventsnap-uploads-anwesh2712"   # hardcoded
+      SourceArn: !Sub "arn:aws:s3:::${UploadBucketName}"
       SourceAccount: !Ref AWS::AccountId
 
   S3NotificationFunction:
@@ -266,14 +301,14 @@ Resources:
               Action:
                 - s3:PutBucketNotification
                 - s3:GetBucketNotification
-              Resource: !Sub "arn:aws:s3:::eventsnap-uploads-anwesh2712"   # hardcoded
+              Resource: !Sub "arn:aws:s3:::${UploadBucketName}"
 
   S3NotificationSetup:
     Type: AWS::CloudFormation::CustomResource
     DependsOn: IndexFacesS3Permission
     Properties:
       ServiceToken: !GetAtt S3NotificationFunction.Arn
-      BucketName: "eventsnap-uploads-anwesh2712"      # hardcoded
+      BucketName: !Ref UploadBucketName
       LambdaArn: !GetAtt IndexFacesFunction.Arn
 
   SearchFunction:
@@ -287,10 +322,16 @@ Resources:
               Action:
                 - rekognition:SearchFacesByImage
               Resource: !Sub "arn:aws:rekognition:${AWS::Region}:${AWS::AccountId}:collection/eventsnap-faces"
+            # DetectFaces has no collection to scope to (it's stateless image
+            # analysis, not a collection lookup) — Rekognition requires "*".
+            - Effect: Allow
+              Action:
+                - rekognition:DetectFaces
+              Resource: "*"
         - DynamoDBReadPolicy:
             TableName: !Ref RoomPhotosTable
         - S3ReadPolicy:
-            BucketName: "eventsnap-uploads-anwesh2712"   # hardcoded
+            BucketName: !Ref UploadBucketName
       Events:
         Api:
           Type: Api
@@ -331,6 +372,14 @@ Resources:
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /rooms/{roomId}
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ApiRoomsPhotosGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /rooms/{roomId}/photos
             Method: GET
             Auth:
               Authorizer: CognitoAuthorizer
@@ -376,7 +425,7 @@ Resources:
       Handler: handlers.cleanup.lambda_handler
       Policies:
         - S3FullAccessPolicy:
-            BucketName: "eventsnap-uploads-anwesh2712"   # hardcoded
+            BucketName: !Ref UploadBucketName
         - DynamoDBReadPolicy:
             TableName: !Ref EventRoomsTable
         - DynamoDBWritePolicy:
@@ -402,6 +451,6 @@ Outputs:
   CognitoClientId:
     Description: App Client ID for Frontend
     Value: !Ref CognitoUserPoolClient
-  UploadBucketName:
+  UploadBucket:
     Description: S3 Bucket for uploads
-    Value: "eventsnap-uploads-anwesh2712"   # hardcoded
+    Value: !Ref UploadBucketName

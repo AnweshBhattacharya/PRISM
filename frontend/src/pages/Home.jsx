@@ -35,10 +35,35 @@ function GeometricBackground() {
     function draw() {
       const isDark = document.documentElement.classList.contains('dark')
       const lineColor = isDark ? '244,245,247' : '10,10,12'
-      const lineOpacity = isDark ? 0.04 : 0.06
+      // Light mode was drawing these at the same near-invisible opacity as
+      // dark mode. Because the light background sits much closer in
+      // luminance to a dark-grey line than a near-black background sits to a
+      // light-grey line, light mode needs noticeably higher opacity for the
+      // animation to actually read on screen.
+      const lineOpacity = isDark ? 0.05 : 0.12
 
       const { width: w, height: h } = canvas
       ctx.clearRect(0, 0, w, h)
+
+      // Faint fixed grid — theme-aware (the equivalent grid on the old Login
+      // page was hardcoded to a light color, so it simply never appeared in
+      // light mode). Drawn once per frame under the drifting lines.
+      const gridOpacity = isDark ? 0.035 : 0.05
+      ctx.strokeStyle = `rgba(${lineColor},${gridOpacity})`
+      ctx.lineWidth = 1
+      const cell = 40
+      for (let gx = 0; gx <= w; gx += cell) {
+        ctx.beginPath()
+        ctx.moveTo(gx, 0)
+        ctx.lineTo(gx, h)
+        ctx.stroke()
+      }
+      for (let gy = 0; gy <= h; gy += cell) {
+        ctx.beginPath()
+        ctx.moveTo(0, gy)
+        ctx.lineTo(w, gy)
+        ctx.stroke()
+      }
 
       for (let i = 0; i <= lineCount; i++) {
         const gap    = w / lineCount
@@ -59,7 +84,7 @@ function GeometricBackground() {
         ctx.stroke()
       }
 
-      const scanOpacity = isDark ? 0.03 : 0.04
+      const scanOpacity = isDark ? 0.035 : 0.08
       const scanY = (t * 18) % h
       const sg = ctx.createLinearGradient(0, scanY - 40, 0, scanY + 40)
       sg.addColorStop(0,   `rgba(${lineColor},0)`)
@@ -113,6 +138,36 @@ function PrismWordmark() {
         </span>
       ))}
     </h1>
+  )
+}
+
+/* ── Camera-focus corner brackets ──────────────────────────────────
+ * Same viewfinder language used on the selfie capture screen: four
+ * corner ticks that snap into focus on hover/focus-within, tying the
+ * "pick Guest or Host" choice to the same visual idea as "find your face."
+ * Idle: short, faint ticks. Hover: ticks extend and brighten. */
+function FocusCard({ children, className = '', style }) {
+  const corners = [
+    { pos: 'top-0 left-0',    border: 'border-l-2 border-t-2' },
+    { pos: 'top-0 right-0',   border: 'border-r-2 border-t-2' },
+    { pos: 'bottom-0 left-0', border: 'border-l-2 border-b-2' },
+    { pos: 'bottom-0 right-0', border: 'border-r-2 border-b-2' },
+  ]
+  return (
+    <div className={`group relative ${className}`} style={style}>
+      {children}
+      <div className="pointer-events-none absolute -top-3 -left-3 -bottom-5 -right-5" aria-hidden="true">
+        {corners.map((corner, i) => (
+          <div
+            key={i}
+            className={`absolute w-3 h-3 group-hover:w-5 group-hover:h-5 group-focus-within:w-5 group-focus-within:h-5
+                        border-[rgb(var(--fg)/0.15)] group-hover:border-[rgb(var(--accent))]
+                        group-focus-within:border-[rgb(var(--accent))]
+                        transition-all duration-200 ease-out ${corner.pos} ${corner.border}`}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -197,10 +252,10 @@ export default function Home() {
 
       {/* ── Cards ────────────────────────────────────────────────── */}
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="w-full max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-10">
 
           {/* Guest card */}
-          <div
+          <FocusCard
             className="raw-card animate-slide-up"
             style={{ animationDelay: '120ms' }}
           >
@@ -256,7 +311,9 @@ export default function Home() {
                     key={key}
                     type="button"
                     onClick={() => setAction(key)}
-                    className={`raw-chip flex-1 justify-center ${action === key ? 'raw-chip-on' : ''}`}
+                    className={`raw-chip flex-1 justify-center focus-ticks transition-transform duration-150
+                                hover:-translate-y-0.5 active:translate-y-0
+                                ${action === key ? 'raw-chip-on' : ''}`}
                   >
                     {label}
                   </button>
@@ -276,7 +333,8 @@ export default function Home() {
                 id="guest-submit-btn"
                 type="submit"
                 disabled={loading}
-                className="raw-btn raw-btn-accent w-full"
+                className="raw-btn raw-btn-accent w-full focus-ticks transition-transform duration-150
+                           hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
               >
                 {loading
                   ? <LoadingSpinner size="sm" label="JOINING..." />
@@ -284,10 +342,10 @@ export default function Home() {
                 }
               </button>
             </form>
-          </div>
+          </FocusCard>
 
           {/* Host card */}
-          <div
+          <FocusCard
             className="raw-card flex flex-col justify-between animate-slide-up"
             style={{ animationDelay: '220ms' }}
           >
@@ -324,20 +382,21 @@ export default function Home() {
               <button
                 id="host-dashboard-btn"
                 onClick={() => navigate('/dashboard')}
-                className="raw-btn raw-btn-accent w-full"
+                className="raw-btn raw-btn-accent w-full focus-ticks transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
               >
                 Go to Dashboard →
               </button>
             ) : (
               <button
                 id="host-login-btn"
-                onClick={() => navigate('/login')}
-                className="raw-btn raw-btn-accent w-full"
+                onClick={() => auth.signinRedirect()}
+                disabled={auth.isLoading}
+                className="raw-btn raw-btn-accent w-full focus-ticks transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
               >
-                Sign In →
+                {auth.isLoading ? <LoadingSpinner size="sm" label="REDIRECTING..." /> : 'Sign In →'}
               </button>
             )}
-          </div>
+          </FocusCard>
         </div>
       </section>
     </div>

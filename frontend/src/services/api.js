@@ -20,19 +20,25 @@ export const setHostToken = (token) => {
 
 // ── Request Interceptor: attach auth token ─────────────────────────────────
 API.interceptors.request.use((config) => {
-  // Try guest token first (sessionStorage), then Cognito ID token
+  // Decide which token to attach based on the request path:
+  // - Guest endpoints (/guest/*) must use the guest JWT (Bearer)
+  // - Host endpoints (/rooms) must use the Cognito ID token (raw, no Bearer)
   const guestToken = sessionStorage.getItem('guestToken')
-  const token = guestToken || currentHostToken
+  const hostToken = currentHostToken
 
-  if (token) {
-    // For guest tokens: send as "Bearer ${token}"
-    // For Cognito ID tokens: send as raw token (no Bearer prefix)
-    if (guestToken) {
-      config.headers.Authorization = `Bearer ${token}`
-    } else {
-      // Cognito User Pool authorizer expects raw token (no Bearer prefix)
-      config.headers.Authorization = token
-    }
+  const url = String(config.url || '')
+  const isGuestEndpoint = url.startsWith('/guest') || url.includes('/guest/')
+  const isHostEndpoint = url.startsWith('/rooms') || url.includes('/rooms')
+
+  if (isGuestEndpoint) {
+    if (guestToken) config.headers.Authorization = `Bearer ${guestToken}`
+  } else if (isHostEndpoint) {
+    if (hostToken) config.headers.Authorization = hostToken
+    else if (guestToken) config.headers.Authorization = `Bearer ${guestToken}`
+  } else {
+    // Unknown endpoint: prefer host token when available, otherwise guest token
+    if (hostToken) config.headers.Authorization = hostToken
+    else if (guestToken) config.headers.Authorization = `Bearer ${guestToken}`
   }
 
   return config
@@ -82,6 +88,9 @@ export const createRoom = (name, expiryDays = 7, allowDownload = true) =>
  */
 export const deleteRoom = (roomId) =>
   API.delete(`/rooms/${roomId}`).then((r) => r.data)
+
+export const getRoomPhotos = (roomId) =>
+  API.get(`/rooms/${roomId}/photos`).then((r) => r.data)
 
 // ── Direct S3 Upload (bypasses Lambda) ────────────────────────────────────
 

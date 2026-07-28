@@ -3,13 +3,31 @@
  * RawBlock v2 — "Is this you?" confirmation dialog for low-confidence face matches.
  * Shown when Rekognition confidence is between 60-80%.
  */
+import { useEffect, useRef } from 'react'
+
 export default function ConfirmModal({ photo, onConfirm, onDeny, onClose }) {
+  const confirmBtnRef = useRef(null)
+
+  useEffect(() => {
+    if (!photo) return
+    confirmBtnRef.current?.focus()
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [photo, onClose])
+
   if (!photo) return null
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 overlay animate-fade-in"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-modal-title"
     >
       <div
         className="raw-card modal max-w-sm w-full space-y-5 animate-pop"
@@ -17,7 +35,7 @@ export default function ConfirmModal({ photo, onConfirm, onDeny, onClose }) {
       >
         {/* Header */}
         <div className="space-y-1">
-          <h2 className="font-display font-bold uppercase tracking-tight text-xl text-fg">
+          <h2 id="confirm-modal-title" className="font-display font-bold uppercase tracking-tight text-xl text-fg">
             Is this you?
           </h2>
           <p className="font-mono text-xs text-muted uppercase tracking-wide">
@@ -42,7 +60,7 @@ export default function ConfirmModal({ photo, onConfirm, onDeny, onClose }) {
           </div>
           <div className="progress-bar">
             <div
-              className="progress-fill"
+              className="progress-fill transition-[width] duration-500 ease-out"
               style={{ width: `${photo.confidence}%` }}
             />
           </div>
@@ -53,17 +71,20 @@ export default function ConfirmModal({ photo, onConfirm, onDeny, onClose }) {
           <button
             id="confirm-modal-no"
             onClick={() => onDeny(photo)}
-            className="raw-btn flex-1 border-danger text-danger"
+            className="raw-btn flex-1 border-danger text-danger focus-ticks transition-transform duration-150
+                       hover:-translate-y-0.5 active:translate-y-0"
             style={{ borderColor: 'rgb(var(--danger))', color: 'rgb(var(--danger))' }}
           >
-            ✗ Not me
+            Not me
           </button>
           <button
             id="confirm-modal-yes"
+            ref={confirmBtnRef}
             onClick={() => onConfirm(photo)}
-            className="raw-btn raw-btn-accent flex-1"
+            className="raw-btn raw-btn-accent flex-1 focus-ticks transition-transform duration-150
+                       hover:-translate-y-0.5 active:translate-y-0"
           >
-            ✓ Yes, that's me
+            Confirm
           </button>
         </div>
       </div>

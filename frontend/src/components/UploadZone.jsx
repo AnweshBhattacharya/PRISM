@@ -59,9 +59,10 @@ export default function UploadZone({ uploads, onFilesSelected }) {
       <div
         {...getRootProps()}
         id="upload-dropzone"
-        className="border-2 border-dashed border-line cursor-pointer
+        className="group border-2 border-dashed border-line cursor-pointer focus-ticks
                    flex flex-col items-center justify-center gap-4
-                   p-10 text-center transition-colors duration-150"
+                   p-10 text-center transition-all duration-150
+                   hover:border-[rgb(var(--accent)/0.6)]"
         style={{
           aspectRatio: '16 / 9',
           minHeight: '200px',
@@ -69,6 +70,7 @@ export default function UploadZone({ uploads, onFilesSelected }) {
             ? {
                 borderColor: 'rgb(var(--accent))',
                 background: 'rgb(var(--accent) / 0.05)',
+                transform: 'scale(1.005)',
               }
             : {
                 background: 'rgb(var(--surface))',
@@ -77,7 +79,11 @@ export default function UploadZone({ uploads, onFilesSelected }) {
       >
         <input {...getInputProps()} />
 
-        <span className="font-mono text-3xl text-faint select-none">
+        <span
+          className={`font-mono text-3xl text-faint select-none transition-transform duration-300 ${
+            isDragActive ? 'animate-bounce' : 'group-hover:-translate-y-0.5'
+          }`}
+        >
           {isDragActive ? '▼' : '↑'}
         </span>
 
