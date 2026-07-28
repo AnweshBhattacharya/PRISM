@@ -10,6 +10,60 @@ import { listRooms, createRoom, deleteRoom, validateRoomCode } from '../services
 import { useGuest } from '../context/AuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
 
+/* ── Shareable text for a room's Room ID + Access Code ──────────────────
+ * Includes the site link so a copy-pasted message is immediately useful
+ * to a guest, not just a bare code with no idea where to enter it. */
+function buildShareText({ roomId, accessCode, roomName }) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return [
+    roomName ? `${roomName} — Prism photo room` : 'Prism photo room',
+    origin,
+    `Room ID: ${roomId}`,
+    `Access Code: ${accessCode}`,
+  ].join('\n')
+}
+
+/* ── Room ID + Access Code, combined into one box with a copy button ───
+ * Used both right after room creation and in the room list's "Share"
+ * panel, so the two places that show this information stay consistent. */
+function AccessCodeBox({ roomId, accessCode, roomName }) {
+  const [justCopied, setJustCopied] = useState(false)
+
+  const handleCopy = async () => {
+    const text = buildShareText({ roomId, accessCode, roomName })
+    try {
+      await navigator.clipboard.writeText(text)
+      setJustCopied(true)
+      setTimeout(() => setJustCopied(false), 2000)
+    } catch (e) {
+      console.error('Copy failed:', e)
+    }
+  }
+
+  return (
+    <div className="border border-line flex items-center justify-between gap-4 p-4">
+      <div className="min-w-0">
+        <p className="font-mono text-xs text-faint uppercase tracking-wide truncate">
+          {roomId}
+        </p>
+        <p
+          className="font-mono font-bold text-fg"
+          style={{ fontSize: 'clamp(1.75rem, 5vw, 2.75rem)', letterSpacing: '0.18em' }}
+        >
+          {accessCode}
+        </p>
+      </div>
+      <button
+        onClick={handleCopy}
+        className="raw-btn raw-btn-accent !px-3 !py-2 text-xs flex-shrink-0 focus-ticks
+                   transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+      >
+        {justCopied ? 'Copied!' : 'Copy Link'}
+      </button>
+    </div>
+  )
+}
+
 /* ── Create Room Modal ──────────────────────────────────────────────────── */
 function CreateRoomModal({ onClose, onCreated }) {
   const [name,          setName]          = useState('')
@@ -133,38 +187,22 @@ function CreateRoomModal({ onClose, onCreated }) {
                 Room Created
               </h2>
               <p className="font-mono text-xs text-faint uppercase tracking-wide mt-1">
-                Share this code with your guests
+                Share this with your guests
               </p>
             </div>
 
-            {/* Room ID */}
-            <div className="border border-line p-4 space-y-4">
-              <div>
-                <p className="raw-label">Room ID</p>
-                <p className="font-mono text-sm text-fg">{result.roomId}</p>
-              </div>
+            <AccessCodeBox roomId={result.roomId} accessCode={result.accessCode} roomName={name} />
 
-              <div>
-                <p className="raw-label">Access Code</p>
-                <p
-                  className="font-mono font-bold text-fg"
-                  style={{ fontSize: 'clamp(2.5rem, 6vw, 3.5rem)', letterSpacing: '0.2em' }}
-                >
-                  {result.accessCode}
-                </p>
-              </div>
-
-              <p
-                className="font-mono text-xs border px-2 py-1.5"
-                style={{
-                  color: 'rgb(var(--warn))',
-                  borderColor: 'rgb(var(--warn))',
-                  background: 'rgb(var(--warn) / 0.05)',
-                }}
-              >
-                Note: Save this code — it won't be shown again
-              </p>
-            </div>
+            <p
+              className="font-mono text-xs border px-2 py-1.5"
+              style={{
+                color: 'rgb(var(--warn))',
+                borderColor: 'rgb(var(--warn))',
+                background: 'rgb(var(--warn) / 0.05)',
+              }}
+            >
+              Note: Save this code — it won't be shown again
+            </p>
 
             <button onClick={onClose} className="raw-btn raw-btn-accent w-full">
               Done
@@ -187,8 +225,8 @@ export default function HostDashboard() {
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [shareRoomId, setShareRoomId] = useState(null)
-  const [copied,     setCopied]     = useState(false)
-  const [enteringRoomId, setEnteringRoomId] = useState(null)  // Track which room is being entered
+  const [enteringRoomId, setEnteringRoomId] = useState(null)   // "Enter" button loading state
+  const [uploadingTestId, setUploadingTestId] = useState(null) // "Upload" button loading state
 
   const loadRooms = async () => {
     try {
@@ -222,27 +260,42 @@ export default function HostDashboard() {
     }
   }
 
-  const handleShare = (room) => {
-    const text = `${room.name}\n\nRoom Code: ${room.accessCode}\nRoom ID: ${room.roomId}`
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const handleEnterRoom = async (room) => {
+  const handleEnterRoom = (room) => {
     if (!room.roomId) {
       console.error('Room ID not available')
       return
     }
+    // HostRoomView is a Cognito-protected route (see ProtectedRoute in
+    // App.jsx) — the host's existing auth already covers it, no extra
+    // session setup needed here.
+    navigate(`/dashboard/rooms/${room.roomId}`)
+  }
 
-    setEnteringRoomId(room.roomId)
+  const handleTestUpload = async (room) => {
+    if (!room.roomId || !room.accessCode) {
+      console.error('Room ID or access code not available')
+      return
+    }
+
+    setUploadingTestId(room.roomId)
     try {
-      navigate(`/dashboard/rooms/${room.roomId}`)
+      // BUG FIX: the guest upload page (GuestUpload.jsx) is guarded by a
+      // real guest session, and its uploads go through the /guest/*
+      // endpoints — which require an actual guest JWT, not the host's
+      // Cognito token. Simply navigating here (as the old code did) left
+      // no guest session in place, so GuestUpload's guard immediately
+      // redirected back to Home. As the room owner we already have the
+      // access code (room.accessCode, returned by listRooms), so exchange
+      // it for a real guest token the same way an actual guest would,
+      // store it, and only then navigate.
+      const data = await validateRoomCode(room.roomId, room.accessCode)
+      loginAsGuest(room.roomId, data)
+      navigate(`/room/${room.roomId}/upload`)
     } catch (err) {
-      console.error('Failed to open room:', err)
-      alert('Could not open room. Please try again.')
+      console.error('Failed to open upload view:', err)
+      alert('Could not open the upload view. Please try again.')
     } finally {
-      setEnteringRoomId(null)
+      setUploadingTestId(null)
     }
   }
 
@@ -298,6 +351,7 @@ export default function HostDashboard() {
             const expired = isExpired(room.expiryDate)
             const isDeleting = deletingId === room.roomId
             const isConfirming = confirmDeleteId === room.roomId
+            const isSharing = shareRoomId === room.roomId
 
             return (
               <div key={room.roomId} className="list-row flex-wrap gap-y-3 group transition-transform duration-150 hover:-translate-y-1 hover:shadow-sm">
@@ -321,11 +375,15 @@ export default function HostDashboard() {
                     </span>
                   </div>
                   <p className="font-mono text-xs text-faint mt-0.5 truncate">{room.roomId}</p>
-                  {/* Show access code on hover/expand */}
-                  {shareRoomId === room.roomId && (
-                    <div className="mt-2 p-2 border border-line bg-surface/50 rounded text-xs space-y-1">
-                      <p className="text-faint">Access Code:</p>
-                      <p className="font-mono font-bold text-lg text-accent tracking-widest">{room.accessCode}</p>
+
+                  {/* Access code — hidden by default, revealed via "Share" */}
+                  {isSharing && (
+                    <div className="mt-3 max-w-sm">
+                      <AccessCodeBox
+                        roomId={room.roomId}
+                        accessCode={room.accessCode}
+                        roomName={room.name}
+                      />
                     </div>
                   )}
                 </div>
@@ -343,65 +401,54 @@ export default function HostDashboard() {
                     <p className="font-mono text-xs text-faint uppercase tracking-wide">Expires</p>
                   </div>
 
-                  {/* Share button with copy to clipboard */}
-                  <div className="relative">
+                  {/* Share toggle — reveals/hides the access code box above */}
+                  <button
+                    onClick={() => setShareRoomId(isSharing ? null : room.roomId)}
+                    className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
+                    style={{
+                      borderColor: 'rgb(var(--accent) / 0.5)',
+                      color: 'rgb(var(--accent))',
+                      background: isSharing ? 'rgb(var(--accent) / 0.1)' : 'transparent',
+                    }}
+                    title="Show the access code and copy a shareable link"
+                  >
+                    {isSharing ? 'Hide Code' : 'Share'}
+                  </button>
+
+                  {/* Enter Room / Upload (test as guest) */}
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setShareRoomId(shareRoomId === room.roomId ? null : room.roomId)}
+                      onClick={() => handleEnterRoom(room)}
+                      disabled={enteringRoomId === room.roomId || expired}
                       className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
                       style={{
-                        borderColor: 'rgb(var(--accent) / 0.5)',
-                        color: 'rgb(var(--accent))',
-                        background: shareRoomId === room.roomId ? 'rgb(var(--accent) / 0.1)' : 'transparent',
+                        borderColor: expired ? 'rgb(var(--faint) / 0.3)' : 'rgb(var(--success) / 0.5)',
+                        color: expired ? 'rgb(var(--faint))' : 'rgb(var(--success))',
+                        opacity: expired ? 0.5 : 1,
                       }}
-                      title="Show and copy access code"
+                      title="View all uploaded photos for this room"
                     >
-                      {shareRoomId === room.roomId ? 'Code shown' : 'Share'}
+                      {enteringRoomId === room.roomId ? (
+                        <LoadingSpinner size="sm" label="..." />
+                      ) : (
+                        'Enter'
+                      )}
                     </button>
 
-                    {/* Inline copy feedback */}
-                    {shareRoomId === room.roomId && (
-                      <button
-                        onClick={() => handleShare(room)}
-                        className="ml-2 raw-btn !px-3 !py-1 !min-h-0 text-xs"
-                        style={{
-                          background: copied ? 'rgb(var(--success) / 0.2)' : 'rgb(var(--accent) / 0.1)',
-                          borderColor: copied ? 'rgb(var(--success))' : 'rgb(var(--accent))',
-                          color: copied ? 'rgb(var(--success))' : 'rgb(var(--accent))',
-                        }}
-                      >
-                        {copied ? 'Copied' : 'Copy'}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleTestUpload(room)}
+                      disabled={uploadingTestId === room.roomId || expired}
+                      className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
+                      style={{ opacity: expired ? 0.5 : 1 }}
+                      title="Open the upload page as a guest"
+                    >
+                      {uploadingTestId === room.roomId ? (
+                        <LoadingSpinner size="sm" label="..." />
+                      ) : (
+                        'Upload'
+                      )}
+                    </button>
                   </div>
-
-                  {/* Enter Room button (test as guest) */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEnterRoom(room)}
-                        disabled={enteringRoomId === room.roomId || expired}
-                        className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
-                        style={{
-                          borderColor: expired ? 'rgb(var(--faint) / 0.3)' : 'rgb(var(--success) / 0.5)',
-                          color: expired ? 'rgb(var(--faint))' : 'rgb(var(--success))',
-                          opacity: expired ? 0.5 : 1,
-                        }}
-                        title="View all uploaded photos for this room"
-                      >
-                        {enteringRoomId === room.roomId ? (
-                          <LoadingSpinner size="sm" label="..." />
-                        ) : (
-                          'Enter'
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => navigate(`/room/${room.roomId}/upload`)}
-                        className="raw-btn !px-3 !py-1 !min-h-0 text-xs"
-                        title="Open upload view as a guest"
-                      >
-                        Upload
-                      </button>
-                    </div>
 
                   {/* Delete: inline confirm state */}
                   {isConfirming ? (
