@@ -187,9 +187,9 @@ Resources:
     Properties:
       CodeUri: backend/
       Handler: authorizers.guest_authorizer.lambda_handler
-      Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref EventRoomsTable
+      # No DynamoDB policy here — the authorizer only verifies the JWT
+      # signature/expiry, it never queries DynamoDB. (The previous
+      # DynamoDBReadPolicy on EventRoomsTable was unused dead permission.)
 
   # ============================================
   # 4. API GATEWAY
@@ -213,6 +213,16 @@ Resources:
                 - Authorization
         DefaultAuthorizer: CognitoAuthorizer
         AddDefaultAuthorizerToCorsPreflight: false
+      # Method-level throttling for the room-code exchange. This is on top
+      # of (not instead of) the per-room lockout in guest_token.py itself:
+      # this limits raw request volume regardless of which room is being
+      # targeted; the app-level counter locks out a specific room being
+      # brute-forced. Neither alone is sufficient.
+      MethodSettings:
+        - ResourcePath: "/guest/token"
+          HttpMethod: POST
+          ThrottlingRateLimit: 2
+          ThrottlingBurstLimit: 5
 
   ApiGatewayUnauthorizedResponse:
     Type: AWS::ApiGateway::GatewayResponse
@@ -322,12 +332,9 @@ Resources:
               Action:
                 - rekognition:SearchFacesByImage
               Resource: !Sub "arn:aws:rekognition:${AWS::Region}:${AWS::AccountId}:collection/eventsnap-faces"
-            # DetectFaces has no collection to scope to (it's stateless image
-            # analysis, not a collection lookup) — Rekognition requires "*".
-            - Effect: Allow
-              Action:
-                - rekognition:DetectFaces
-              Resource: "*"
+            # Note: rekognition:DetectFaces was previously granted here with
+            # Resource: "*" but the handler never calls DetectFaces —
+            # removed as unused permission.
         - DynamoDBReadPolicy:
             TableName: !Ref RoomPhotosTable
         - S3ReadPolicy:
@@ -350,6 +357,24 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref EventRoomsTable
+        # FIX: this was missing entirely. _get_room_photos queries
+        # RoomPhotosTable, and the delete-room/delete-photo paths below now
+        # also write to it — without this, every one of those calls threw
+        # AccessDeniedException, which the handler's generic except block
+        # turned into the "Failed to fetch room photos." 500 error.
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RoomPhotosTable
+        # Needed for: generating presigned GET URLs to actually resolve
+        # (S3 re-checks the signing principal's IAM permissions at fetch
+        # time, not at signing time), plus the cascading delete paths
+        # deleting S3 objects directly.
+        - S3CrudPolicy:
+            BucketName: !Ref UploadBucketName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rekognition:DeleteFaces
+              Resource: !Sub "arn:aws:rekognition:${AWS::Region}:${AWS::AccountId}:collection/eventsnap-faces"
       Events:
         ApiRoomsGet:
           Type: Api
@@ -383,6 +408,17 @@ Resources:
             Method: GET
             Auth:
               Authorizer: CognitoAuthorizer
+        # NEW: single-photo delete, so hosts (and you) never need to
+        # delete photo data directly from the AWS console again — this
+        # endpoint keeps photoCount, S3, and Rekognition all in sync.
+        ApiRoomsPhotoDelete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /rooms/{roomId}/photos/{photoId}
+            Method: DELETE
+            Auth:
+              Authorizer: CognitoAuthorizer
         ApiRoomsByIdPut:
           Type: Api
           Properties:
@@ -408,6 +444,11 @@ Resources:
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref EventRoomsTable
+        # NEW: needed for the per-room rate-limit counter in
+        # guest_token.py, which reads/writes/deletes THROTTLE# items in
+        # this table.
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GuestSessionsTable
       Events:
         Api:
           Type: Api
